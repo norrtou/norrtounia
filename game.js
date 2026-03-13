@@ -313,7 +313,7 @@ function renderSetup() {
             <span class="slot-sub">${h.race}</span>
             <span class="slot-sub">${h.job}</span>
             <span class="slot-stats">HP:${h.hp} STR:${h.str} INT:${h.int}</span>
-            <button class="px-btn" onclick="toggleLock(${i})">${h.locked ? '🔒 BOUND' : '🔓 BIND'}</button>
+            <button class="px-btn" onclick="toggleLock(${i})">${h.locked ? '🔒 CHOSEN' : '🔓 CHOOSE'}</button>
         `;
         container.appendChild(div);
     });
