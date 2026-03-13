@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Norrtounia: A text-based dungeon crawler in a dark fantasy world.">
+    <title>Norrtounia: The Dark Forest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ══ TITLE ══ -->
+    <header id="site-header">
+        <h1 id="game-title">NORRTOUNIA</h1>
+        <p id="game-sub">The Dark Forest</p>
+    </header>
+
+    <!-- ══ FRAME — frame.jpg background, game content inside the black opening ══ -->
+    <div id="frame-wrap">
+        <div id="fog" aria-hidden="true"></div>
+
+        <main id="game-window" role="main">
+
+            <!-- INTRO: lore + instructions -->
+            <section id="screen-intro" class="screen">
+                <div id="intro-text">
+                    <p class="intro-line" style="color:var(--gold)">✦ Hear Ye, Brave Adventurer ✦</p>
+                    <p class="intro-line">Thou standest at the threshold of the Darkwood of Norrtounia — a forest cursed since the First Age, where shadows walk and ancient things hunger.</p>
+                    <p class="intro-line">Thy quest: lead a fellowship of three souls through the wood and emerge alive upon the far shore. The road is long. The trials are many.</p>
+                    <p class="intro-line">At each crossing of paths, three choices shall be offered thee. One bringeth fortune, one bringeth peril, and one bringeth neither. Choose wisely — or die foolishly.</p>
+                    <p class="intro-line">Monsters stalk the trails. Strange magic lingers in the glades. Relics of power are buried beneath the roots.</p>
+                    <p class="intro-line" style="color:var(--dim)">Should thy fellowship endure longer than others, thy name shall be etched in the Hall of Legends.</p>
+                    <p class="intro-line" style="color:var(--dim)">Beware above all else the sound of a distant <em>honk</em>. Thou shalt know it when it cometh.</p>
+                    <p class="intro-line" style="color:var(--gold)">May the Old Gods watch over thee.</p>
+                </div>
+            </section>
+
+            <!-- SETUP: character slots -->
+            <section id="screen-setup" class="screen hidden">
+                <div id="party-slots" role="list"></div>
+            </section>
+
+            <!-- PLAY: log + stats -->
+            <section id="screen-play" class="screen hidden">
+                <div id="game-log" role="log" aria-live="polite"></div>
+                <div id="party-stats" role="list"></div>
+            </section>
+
+            <!-- END: victory or defeat -->
+            <section id="screen-end" class="screen hidden">
+                <h2 id="end-title"></h2>
+                <div id="end-flavour"></div>
+                <div id="highscore-list"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ══ CONTROLS — below the frame ══ -->
+    <div id="controls">
+        <div id="ctrl-intro">
+            <button id="btn-enter" class="px-btn gold-btn">▶ Enter the Wood</button>
+        </div>
+        <div id="ctrl-setup" class="hidden">
+            <button id="btn-roll"  class="px-btn">⚄ Roll Fate [R]</button>
+            <button id="btn-start" class="px-btn gold-btn">▶ Commence Journey</button>
+        </div>
+        <div id="ctrl-play"  class="hidden"></div>
+        <div id="ctrl-end"   class="hidden">
+            <button onclick="location.reload()" class="px-btn gold-btn">↺ Begin Anew</button>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

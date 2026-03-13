@@ -1,0 +1,313 @@
+/* ================================================================
+   NORRTOUNIA — style.css
+   ----------------------------------------------------------------
+   Layout:
+     body         flex column, full viewport, black background
+     #site-header title, fixed height at top
+     #frame-wrap  frame.jpg bg, aspect-ratio 1376/768
+     #game-window absolute over black opening (415,185,548×400)
+     #controls    buttons row below frame
+   ================================================================ */
+
+:root {
+    --font:   'Press Start 2P', cursive;
+    --gold:   #c9a227;
+    --amber:  #e8c45a;
+    --blood:  #8a0000;
+    --pale:   #e8dfc8;
+    --dim:    #7a7060;
+    --moss:   #3e6b15;
+    --ink:    rgba(0,0,0,0.62);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+
+body {
+    background:     #080604;
+    color:          var(--pale);
+    font-family:    var(--font);
+    display:        flex;
+    flex-direction: column;
+    align-items:    center;
+    justify-content:center;
+    height:         100vh;
+    overflow:       hidden;
+    padding:        6px 12px 4px;
+    gap:            4px;
+}
+
+/* ── Header ── */
+#site-header { text-align:center; flex-shrink:0; }
+
+#game-title {
+    font-size: clamp(14px, 2.4vw, 26px);
+    color:     var(--gold);
+    text-shadow: 0 0 16px rgba(201,162,39,0.50), 2px 2px 0 #000;
+    letter-spacing: 3px;
+    margin-bottom: 3px;
+}
+#game-sub {
+    font-size: clamp(6px, 0.85vw, 9px);
+    color:     var(--dim);
+    letter-spacing: 2px;
+}
+
+/* ── Frame wrapper — preserves 1376:768 aspect ratio ── */
+#frame-wrap {
+    position:    relative;
+    flex-shrink: 0;
+    width:       min(98vw, calc((100vh - 148px) * 1376 / 768));
+    aspect-ratio:1376 / 768;
+    background:  url('frame.jpg') no-repeat center / 100% 100%;
+}
+
+/* ── Fog ── */
+#fog {
+    position: absolute;
+    left:30.16%; top:24.09%; width:39.83%; height:52.08%;
+    pointer-events:none;
+    background: radial-gradient(ellipse 50% 40% at 50% 35%,
+        transparent 30%, rgba(0,0,0,0.65) 100%);
+    z-index:6;
+    animation: fogPulse 9s ease-in-out infinite alternate;
+}
+@keyframes fogPulse {
+    from { opacity:0.25; }
+    to   { opacity:0.65; }
+}
+
+/* ── Screen shake (applied to #frame-wrap) ── */
+.shake { animation: shakeAnim 0.30s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes shakeAnim {
+    15%,85% { transform:translate(-2px, 2px); }
+    30%,70% { transform:translate( 3px,-3px); }
+    50%     { transform:translate(-4px, 4px); }
+    60%     { transform:translate( 4px,-4px); }
+}
+
+/* ── Game window — over the black opening ── */
+#game-window {
+    position:        absolute;
+    left:   30.16%;
+    top:    24.09%;
+    width:  39.83%;
+    height: 52.08%;
+    z-index:         10;
+    display:         flex;
+    flex-direction:  column;
+    overflow:        hidden;
+    padding:         1.6% 2.2%;
+}
+
+.screen {
+    display:        flex;
+    flex-direction: column;
+    flex:           1;
+    min-height:     0;
+    overflow:       hidden;
+}
+.hidden { display:none !important; }
+
+/* ════════════════════════════════════════
+   INTRO SCREEN
+   ════════════════════════════════════════ */
+#intro-text {
+    display:        flex;
+    flex-direction: column;
+    gap:            5%;
+    flex:           1;
+    overflow-y:     auto;
+    scrollbar-width:none;
+    justify-content:center;
+    padding:        1% 0;
+}
+#intro-text::-webkit-scrollbar { display:none; }
+
+.intro-line {
+    font-size: clamp(8px, 0.72vw, 11px);
+    line-height:1.9;
+    color:     var(--pale);
+    text-shadow:1px 1px 0 #000;
+}
+
+/* ════════════════════════════════════════
+   SETUP SCREEN
+   ════════════════════════════════════════ */
+#party-slots {
+    display:   flex;
+    gap:       2%;
+    flex:      1;
+    min-height:0;
+    padding:   2% 0;
+}
+
+.slot-card {
+    flex:            1;
+    background:      var(--ink);
+    display:         flex;
+    flex-direction:  column;
+    align-items:     center;
+    justify-content: center;
+    gap:             5%;
+    padding:         5% 3%;
+    text-align:      center;
+    font-size:       clamp(8px, 0.68vw, 11px);
+    line-height:     1.9;
+    text-shadow:     1px 1px 0 #000;
+    transition:      background 0.18s;
+}
+.slot-card.locked   { background: rgba(0,45,0,0.45); }
+.slot-name {
+    color:     var(--gold);
+    font-size: clamp(9px, 0.84vw, 13px);
+    display:   block;
+    text-shadow:1px 1px 0 #000;
+}
+.slot-sub   { color:var(--dim);  display:block; }
+.slot-stats { color:var(--pale); display:block; }
+
+/* ════════════════════════════════════════
+   PLAY SCREEN
+   ════════════════════════════════════════ */
+#game-log {
+    flex:            1;
+    overflow-y:      auto;
+    scrollbar-width: none;
+    min-height:      0;
+    display:         flex;
+    flex-direction:  column-reverse;
+    padding:         2px 0 3px;
+    font-size:       clamp(8px, 0.78vw, 12px);
+    line-height:     2.05;
+}
+#game-log::-webkit-scrollbar { display:none; }
+#game-log p {
+    margin:      0;
+    text-shadow: 1px 1px 0 #000;
+    color:       var(--pale);   /* default: white-ish */
+}
+
+#party-stats {
+    display:    grid;
+    grid-template-columns: repeat(3,1fr);
+    gap:        2.5%;
+    flex-shrink:0;
+    padding-top:2.5%;
+}
+.stat-card {
+    background: var(--ink);
+    padding:    4% 3% 4% 5%;
+    font-size:  clamp(7px, 0.68vw, 10px);
+    line-height:2.0;
+    text-shadow:1px 1px 0 #000;
+}
+.stat-name  { color:var(--gold);  font-size:clamp(8px, 0.78vw, 12px); display:block; }
+.stat-dead  { color:var(--blood); }
+.stat-item  { color:var(--dim);   font-size:clamp(6px, 0.58vw, 9px);  display:block; }
+
+/* ════════════════════════════════════════
+   END SCREEN — VICTORY vs DEFEAT
+   ════════════════════════════════════════ */
+#screen-end {
+    align-items: center;
+    gap: 4%;
+}
+#end-title {
+    flex-shrink: 0;
+    font-size:   clamp(9px, 0.95vw, 14px);
+    text-shadow: 1px 1px 0 #000;
+    text-align:  center;
+}
+#end-flavour {
+    flex-shrink: 0;
+    font-size:   clamp(6px, 0.58vw, 9px);
+    color:       var(--dim);
+    text-align:  center;
+    line-height: 1.8;
+}
+
+/* Victory */
+#screen-end.victory #end-title {
+    color: var(--gold);
+    animation: victoryGlow 2.5s ease-in-out infinite;
+}
+@keyframes victoryGlow {
+    0%,100% { text-shadow:0 0 8px rgba(201,162,39,0.4), 2px 2px 0 #000; }
+    50%     { text-shadow:0 0 28px rgba(201,162,39,0.9), 0 0 55px rgba(201,162,39,0.3), 2px 2px 0 #000; }
+}
+
+/* Defeat */
+#screen-end.defeat #end-title {
+    color: var(--blood);
+    animation: defeatPulse 3.5s ease-in-out infinite;
+}
+@keyframes defeatPulse {
+    0%,100% { opacity:1; text-shadow:0 0 8px rgba(138,0,0,0.5); }
+    50%     { opacity:0.4; text-shadow:none; }
+}
+
+#highscore-list {
+    flex:       1;
+    overflow-y: auto;
+    scrollbar-width:none;
+    width:      100%;
+    font-size:  clamp(7px, 0.68vw, 10px);
+    line-height:2.2;
+    text-align: center;
+    min-height: 0;
+}
+#highscore-list::-webkit-scrollbar { display:none; }
+#highscore-list p { margin:0; }
+
+/* ════════════════════════════════════════
+   CONTROLS — below the frame
+   ════════════════════════════════════════ */
+#controls {
+    flex-shrink: 0;
+    width:  min(98vw, calc((100vh - 148px) * 1376 / 768));
+    display:flex;
+    justify-content:center;
+    gap:8px;
+}
+
+#ctrl-intro, #ctrl-setup, #ctrl-play, #ctrl-end {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    justify-content:center;
+    width:100%;
+}
+
+/* ── Buttons ── */
+.px-btn {
+    background:  rgba(12,8,4,0.92);
+    border:      2px solid rgba(100,72,30,0.60);
+    color:       var(--pale);
+    font-family: var(--font);
+    font-size:   clamp(8px, 0.95vw, 13px);
+    padding:     9px 16px;
+    cursor:      pointer;
+    text-align:  left;
+    text-shadow: 1px 1px 0 #000;
+    transition:  border-color 0.12s, background 0.12s, color 0.12s;
+    line-height: 1.5;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+}
+.px-btn:hover, .px-btn:focus-visible {
+    border-color: var(--gold);
+    background:   rgba(22,16,6,0.98);
+    color:        var(--amber);
+    outline:      none;
+}
+.gold-btn {
+    border-color: rgba(201,162,39,0.55);
+    color:        var(--gold);
+}
+.gold-btn:hover {
+    border-color: var(--amber);
+    color:        var(--amber);
+}
+
+/* Choice buttons can wrap */
+#ctrl-play .px-btn { white-space:normal; text-align:left; }
