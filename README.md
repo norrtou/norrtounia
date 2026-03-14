@@ -44,3 +44,4 @@ A proper death screen with the names of fallen heroes listed
 Sound effects per damage type — fire crackle, frost tinkle, etc.
 Mobile / touch support for the controls
 Better visuals and clearer interface
+Fix music bugging out and stopping
