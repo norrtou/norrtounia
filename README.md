@@ -36,7 +36,7 @@ Team naming: Input on intro screen, saved with every highscore entry
 Log highlighting: Current prompt gets a gold left-border + white text; past events dim to grey
 BIND button: Glows green with layered box-shadow when a hero is locked
 
-Planned for 1.0
+Planned for the future
 More scenario variety — the 15 scenarios start repeating in a 100-turn run
 Class-specific special abilities — passive bonuses that trigger in certain scenario types (e.g. Druids get better nature outcomes, Rogues can auto-succeed on stealth checks)
 Party synergy — bonuses when certain race/class combos are in the same party
