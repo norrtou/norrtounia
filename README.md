@@ -45,3 +45,4 @@ Sound effects per damage type — fire crackle, frost tinkle, etc.
 Mobile / touch support for the controls
 Better visuals and clearer interface
 Fix music bugging out and stopping
+Add some concepts of strategy and planning, so its less just random
