@@ -1,12 +1,5 @@
 /* ================================================================
-   NORRTOUNIA — style.css
-   ----------------------------------------------------------------
-   Layout:
-     body         flex column, full viewport, black background
-     #site-header title, fixed height at top
-     #frame-wrap  frame.jpg bg, aspect-ratio 1376/768
-     #game-window absolute over black opening (415,185,548×400)
-     #controls    buttons row below frame
+   NORRTOUNIA — style.css  v0.3
    ================================================================ */
 
 :root {
@@ -18,6 +11,7 @@
     --dim:    #7a7060;
     --moss:   #3e6b15;
     --ink:    rgba(0,0,0,0.62);
+    --ink2:   rgba(0,0,0,0.80);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
@@ -52,31 +46,31 @@ body {
     letter-spacing: 2px;
 }
 
-/* ── Frame wrapper — preserves 1376:768 aspect ratio ── */
+/* ── Frame wrapper ── */
 #frame-wrap {
-    position:    relative;
-    flex-shrink: 0;
-    width:       min(98vw, calc((100vh - 148px) * 1376 / 768));
-    aspect-ratio:1376 / 768;
-    background:  url('frame.jpg') no-repeat center / 100% 100%;
+    position:     relative;
+    flex-shrink:  0;
+    width:        min(98vw, calc((100vh - 148px) * 1376 / 768));
+    aspect-ratio: 1376 / 768;
+    background:   url('frame.jpg') no-repeat center / 100% 100%;
 }
 
 /* ── Fog ── */
 #fog {
-    position: absolute;
+    position:      absolute;
     left:30.16%; top:24.09%; width:39.83%; height:52.08%;
     pointer-events:none;
-    background: radial-gradient(ellipse 50% 40% at 50% 35%,
-        transparent 30%, rgba(0,0,0,0.65) 100%);
-    z-index:6;
-    animation: fogPulse 9s ease-in-out infinite alternate;
+    background:    radial-gradient(ellipse 50% 40% at 50% 35%,
+                       transparent 30%, rgba(0,0,0,0.65) 100%);
+    z-index:       6;
+    animation:     fogPulse 9s ease-in-out infinite alternate;
 }
 @keyframes fogPulse {
     from { opacity:0.25; }
     to   { opacity:0.65; }
 }
 
-/* ── Screen shake (applied to #frame-wrap) ── */
+/* ── Screen shake ── */
 .shake { animation: shakeAnim 0.30s cubic-bezier(.36,.07,.19,.97) both; }
 @keyframes shakeAnim {
     15%,85% { transform:translate(-2px, 2px); }
@@ -85,7 +79,7 @@ body {
     60%     { transform:translate( 4px,-4px); }
 }
 
-/* ── Game window — over the black opening ── */
+/* ── Game window ── */
 #game-window {
     position:        absolute;
     left:   30.16%;
@@ -108,31 +102,66 @@ body {
 }
 .hidden { display:none !important; }
 
-/* ════════════════════════════════════════
+/* ═════════════════════════════════════════
    INTRO SCREEN
-   ════════════════════════════════════════ */
+   ═════════════════════════════════════════ */
 #intro-text {
     display:        flex;
     flex-direction: column;
-    gap:            5%;
+    gap:            4%;
     flex:           1;
     overflow-y:     auto;
     scrollbar-width:none;
     justify-content:center;
-    padding:        1% 0;
+    padding:        1% 0 2%;
 }
 #intro-text::-webkit-scrollbar { display:none; }
 
 .intro-line {
-    font-size: clamp(8px, 0.72vw, 11px);
-    line-height:1.9;
-    color:     var(--pale);
-    text-shadow:1px 1px 0 #000;
+    font-size:   clamp(8px, 0.72vw, 11px);
+    line-height: 1.9;
+    color:       var(--pale);
+    text-shadow: 1px 1px 0 #000;
 }
+.intro-gold { color: var(--gold) !important; }
+.intro-dim  { color: var(--dim)  !important; }
 
-/* ════════════════════════════════════════
+/* Team name input */
+#team-name-wrap {
+    flex-shrink: 0;
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+    padding-top: 3%;
+    flex-wrap:   wrap;
+    justify-content: center;
+}
+.team-label {
+    font-size:   clamp(6px, 0.65vw, 9px);
+    color:       var(--gold);
+    white-space: nowrap;
+}
+.team-input {
+    background:  rgba(0,0,0,0.70);
+    border:      1px solid rgba(201,162,39,0.45);
+    color:       var(--pale);
+    font-family: var(--font);
+    font-size:   clamp(7px, 0.70vw, 10px);
+    padding:     5px 8px;
+    outline:     none;
+    width:       min(180px, 50%);
+    text-align:  center;
+    letter-spacing: 1px;
+}
+.team-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 8px rgba(201,162,39,0.30);
+}
+.team-input::placeholder { color: var(--dim); }
+
+/* ═════════════════════════════════════════
    SETUP SCREEN
-   ════════════════════════════════════════ */
+   ═════════════════════════════════════════ */
 #party-slots {
     display:   flex;
     gap:       2%;
@@ -148,27 +177,62 @@ body {
     flex-direction:  column;
     align-items:     center;
     justify-content: center;
-    gap:             5%;
-    padding:         5% 3%;
+    gap:             4%;
+    padding:         4% 3%;
     text-align:      center;
     font-size:       clamp(8px, 0.68vw, 11px);
     line-height:     1.9;
     text-shadow:     1px 1px 0 #000;
-    transition:      background 0.18s;
+    transition:      background 0.18s, border-color 0.18s;
+    border:          1px solid rgba(100,80,40,0.30);
 }
-.slot-card.locked   { background: rgba(0,45,0,0.45); }
+.slot-card.locked {
+    background:  rgba(0,45,0,0.45);
+    border-color:rgba(62,107,21,0.50);
+}
+
+.slot-race-icon {
+    font-size: clamp(14px, 1.8vw, 22px);
+    line-height: 1;
+}
 .slot-name {
     color:     var(--gold);
-    font-size: clamp(9px, 0.84vw, 13px);
+    font-size: clamp(8px, 0.80vw, 12px);
     display:   block;
-    text-shadow:1px 1px 0 #000;
+    text-shadow: 1px 1px 0 #000;
 }
 .slot-sub   { color:var(--dim);  display:block; }
-.slot-stats { color:var(--pale); display:block; }
+.slot-stats { color:var(--pale); display:block; font-size: clamp(7px, 0.62vw, 9px); }
 
-/* ════════════════════════════════════════
+/* BIND button — glows when locked */
+.bind-btn {
+    background:  rgba(10,7,4,0.90);
+    border:      2px solid rgba(100,72,30,0.55);
+    color:       var(--pale);
+    font-family: var(--font);
+    font-size:   clamp(7px, 0.62vw, 9px);
+    padding:     5px 10px;
+    cursor:      pointer;
+    transition:  all 0.18s;
+    letter-spacing: 0.5px;
+    text-shadow: 1px 1px 0 #000;
+}
+.bind-btn:hover { border-color: var(--gold); color: var(--amber); }
+
+/* When the card is locked, give BIND a green glow */
+.slot-card.locked .bind-btn {
+    border-color: rgba(62,107,21,0.80);
+    color:        #7dbc3a;
+    box-shadow:   0 0 8px rgba(61,107,21,0.70),
+                  0 0 18px rgba(61,107,21,0.30),
+                  inset 0 0 4px rgba(61,107,21,0.15);
+}
+
+/* ═════════════════════════════════════════
    PLAY SCREEN
-   ════════════════════════════════════════ */
+   ═════════════════════════════════════════ */
+
+/* Game log */
 #game-log {
     flex:            1;
     overflow-y:      auto;
@@ -181,104 +245,162 @@ body {
     line-height:     2.05;
 }
 #game-log::-webkit-scrollbar { display:none; }
+
+/* Default log line */
 #game-log p {
     margin:      0;
     text-shadow: 1px 1px 0 #000;
-    color:       var(--pale);   /* default: white-ish */
+    color:       var(--dim);      /* past lines are dim */
+    transition:  color 0.3s;
 }
 
+/* The most-recent PROMPT line — bright white + left accent bar */
+#game-log p.prompt-current {
+    color:       #ffffff !important;
+    border-left: 2px solid var(--gold);
+    padding-left:5px;
+    margin-left: -5px;
+    background:  rgba(255,255,255,0.04);
+}
+/* Most-recent outcome/detail line (non-prompt) — slightly brighter than old */
+#game-log p.log-recent {
+    color:       var(--pale) !important;
+}
+/* Blood-red lines stay red regardless of age */
+#game-log p.log-blood { color: var(--blood) !important; }
+
+/* Party stat cards */
 #party-stats {
     display:    grid;
     grid-template-columns: repeat(3,1fr);
     gap:        2.5%;
     flex-shrink:0;
-    padding-top:2.5%;
+    padding-top:2%;
 }
-.stat-card {
-    background: var(--ink);
-    padding:    4% 3% 4% 5%;
-    font-size:  clamp(7px, 0.68vw, 10px);
-    line-height:2.0;
-    text-shadow:1px 1px 0 #000;
-}
-.stat-name  { color:var(--gold);  font-size:clamp(8px, 0.78vw, 12px); display:block; }
-.stat-dead  { color:var(--blood); }
-.stat-item  { color:var(--dim);   font-size:clamp(6px, 0.58vw, 9px);  display:block; }
 
-/* ════════════════════════════════════════
-   END SCREEN — VICTORY vs DEFEAT
-   ════════════════════════════════════════ */
-#screen-end {
-    align-items: center;
-    gap: 4%;
+.stat-card {
+    position:    relative;   /* needed for .stat-flash */
+    background:  var(--ink2);
+    padding:     4% 3% 4% 5%;
+    font-size:   clamp(7px, 0.68vw, 10px);
+    line-height: 2.0;
+    text-shadow: 1px 1px 0 #000;
+    border-left: 2px solid rgba(100,80,40,0.30);
+    overflow:    visible;
 }
+.stat-name {
+    color:     var(--gold);
+    font-size: clamp(7px, 0.72vw, 11px);
+    display:   block;
+    margin-bottom: 1px;
+}
+.stat-lv {
+    color:     var(--amber);
+    font-size: 0.85em;
+}
+.stat-dead  { color:var(--blood); }
+.stat-item  { color:var(--dim); font-size:clamp(5px, 0.55vw, 8px); display:block; margin-top:1px; }
+.stat-xp    { color:var(--dim); font-size:clamp(5px, 0.52vw, 7px); display:block; }
+
+/* Level-up / stat-gain flash overlay */
+.stat-flash {
+    position:       absolute;
+    top:            30%;
+    left:           50%;
+    transform:      translateX(-50%);
+    white-space:    nowrap;
+    font-size:      clamp(8px, 0.80vw, 11px);
+    font-weight:    bold;
+    pointer-events: none;
+    z-index:        200;
+    animation:      floatUp 2.4s ease-out forwards;
+}
+@keyframes floatUp {
+    0%   { opacity:1; transform:translateX(-50%) translateY(0);     }
+    65%  { opacity:1;                                               }
+    100% { opacity:0; transform:translateX(-50%) translateY(-45px); }
+}
+
+/* Treasury bar */
+#treasury-bar {
+    flex-shrink:  0;
+    font-size:    clamp(6px, 0.60vw, 8px);
+    color:        var(--dim);
+    text-align:   center;
+    padding-top:  1.5%;
+    letter-spacing: 1px;
+    text-shadow:  1px 1px 0 #000;
+}
+
+/* ═════════════════════════════════════════
+   END SCREEN
+   ═════════════════════════════════════════ */
+#screen-end { align-items:center; gap:4%; }
+
 #end-title {
-    flex-shrink: 0;
+    flex-shrink:0;
     font-size:   clamp(9px, 0.95vw, 14px);
     text-shadow: 1px 1px 0 #000;
     text-align:  center;
 }
 #end-flavour {
-    flex-shrink: 0;
+    flex-shrink:0;
     font-size:   clamp(6px, 0.58vw, 9px);
     color:       var(--dim);
     text-align:  center;
     line-height: 1.8;
+    padding:     0 4%;
 }
 
-/* Victory */
 #screen-end.victory #end-title {
     color: var(--gold);
     animation: victoryGlow 2.5s ease-in-out infinite;
 }
 @keyframes victoryGlow {
-    0%,100% { text-shadow:0 0 8px rgba(201,162,39,0.4), 2px 2px 0 #000; }
+    0%,100% { text-shadow:0 0 8px  rgba(201,162,39,0.4), 2px 2px 0 #000; }
     50%     { text-shadow:0 0 28px rgba(201,162,39,0.9), 0 0 55px rgba(201,162,39,0.3), 2px 2px 0 #000; }
 }
-
-/* Defeat */
 #screen-end.defeat #end-title {
     color: var(--blood);
     animation: defeatPulse 3.5s ease-in-out infinite;
 }
 @keyframes defeatPulse {
-    0%,100% { opacity:1; text-shadow:0 0 8px rgba(138,0,0,0.5); }
+    0%,100% { opacity:1;   text-shadow:0 0 8px rgba(138,0,0,0.5); }
     50%     { opacity:0.4; text-shadow:none; }
 }
 
 #highscore-list {
-    flex:       1;
-    overflow-y: auto;
-    scrollbar-width:none;
-    width:      100%;
-    font-size:  clamp(7px, 0.68vw, 10px);
-    line-height:2.2;
-    text-align: center;
-    min-height: 0;
+    flex:            1;
+    overflow-y:      auto;
+    scrollbar-width: none;
+    width:           100%;
+    font-size:       clamp(6px, 0.62vw, 9px);
+    line-height:     2.2;
+    text-align:      center;
+    min-height:      0;
 }
 #highscore-list::-webkit-scrollbar { display:none; }
 #highscore-list p { margin:0; }
 
-/* ════════════════════════════════════════
-   CONTROLS — below the frame
-   ════════════════════════════════════════ */
+/* ═════════════════════════════════════════
+   CONTROLS
+   ═════════════════════════════════════════ */
 #controls {
-    flex-shrink: 0;
-    width:  min(98vw, calc((100vh - 148px) * 1376 / 768));
-    display:flex;
+    flex-shrink:    0;
+    width:          min(98vw, calc((100vh - 148px) * 1376 / 768));
+    display:        flex;
     justify-content:center;
-    gap:8px;
+    gap:            8px;
 }
 
 #ctrl-intro, #ctrl-setup, #ctrl-play, #ctrl-end {
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
+    display:        flex;
+    gap:            8px;
+    flex-wrap:      wrap;
     justify-content:center;
-    width:100%;
+    width:          100%;
 }
 
-/* ── Buttons ── */
 .px-btn {
     background:  rgba(12,8,4,0.92);
     border:      2px solid rgba(100,72,30,0.60);
@@ -295,19 +417,15 @@ body {
     letter-spacing: 0.5px;
 }
 .px-btn:hover, .px-btn:focus-visible {
-    border-color: var(--gold);
-    background:   rgba(22,16,6,0.98);
-    color:        var(--amber);
-    outline:      none;
+    border-color:var(--gold);
+    background:  rgba(22,16,6,0.98);
+    color:       var(--amber);
+    outline:     none;
 }
 .gold-btn {
-    border-color: rgba(201,162,39,0.55);
-    color:        var(--gold);
+    border-color:rgba(201,162,39,0.55);
+    color:       var(--gold);
 }
-.gold-btn:hover {
-    border-color: var(--amber);
-    color:        var(--amber);
-}
+.gold-btn:hover { border-color:var(--amber); color:var(--amber); }
 
-/* Choice buttons can wrap */
 #ctrl-play .px-btn { white-space:normal; text-align:left; }

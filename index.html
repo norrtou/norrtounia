@@ -15,26 +15,34 @@
     <!-- ══ TITLE ══ -->
     <header id="site-header">
         <h1 id="game-title">NORRTOUNIA</h1>
-        <p id="game-sub">The Dark Forest v0.1</p>
+        <p id="game-sub">The Dark Forest</p>
     </header>
 
-    <!-- ══ FRAME — frame.jpg background, game content inside the black opening ══ -->
+    <!-- ══ FRAME ══ -->
     <div id="frame-wrap">
         <div id="fog" aria-hidden="true"></div>
 
         <main id="game-window" role="main">
 
-            <!-- INTRO: lore + instructions -->
+            <!-- INTRO: lore, instructions, team naming -->
             <section id="screen-intro" class="screen">
                 <div id="intro-text">
-                    <p class="intro-line" style="color:var(--gold)">✦ Hear Ye, Brave Adventurer ✦</p>
+                    <p class="intro-line intro-gold">✦ Hear Ye, Brave Adventurer ✦</p>
                     <p class="intro-line">Thou standest at the threshold of the Darkwood of Norrtounia — a forest cursed since the First Age, where shadows walk and ancient things hunger.</p>
-                    <p class="intro-line">Thy quest: lead a fellowship of three souls through the wood and emerge alive upon the far shore. The road is long. The trials are many.</p>
+                    <p class="intro-line">Thy quest: lead a fellowship of three souls through one hundred trials and emerge alive upon the far shore.</p>
                     <p class="intro-line">At each crossing of paths, three choices shall be offered thee. One bringeth fortune, one bringeth peril, and one bringeth neither. Choose wisely — or die foolishly.</p>
-                    <p class="intro-line">Monsters stalk the trails. Strange magic lingers in the glades. Relics of power are buried beneath the roots.</p>
-                    <p class="intro-line" style="color:var(--dim)">Should thy fellowship endure longer than others, thy name shall be etched in the Hall of Legends.</p>
-                    <p class="intro-line" style="color:var(--dim)">Beware above all else the sound of a distant <em>honk</em>. Thou shalt know it when it cometh.</p>
-                    <p class="intro-line" style="color:var(--gold)">May the Old Gods watch over thee.</p>
+                    <p class="intro-line">Thy heroes shall grow in power as they fight — gaining levels, new abilities, and the wisdom of battle-hardened survivors.</p>
+                    <p class="intro-line">Monsters stalk the trails. Strange magic lingers in the glades. Treasure of gold and precious gems awaiteth the bold.</p>
+                    <p class="intro-line intro-dim">Should thy fellowship survive all one hundred trials, thy ranking shall be decided by the treasury gathered along the way.</p>
+                    <p class="intro-line intro-dim">Beware above all else the sound of a distant <em>honk</em>. Thou shalt know it when it cometh.</p>
+                    <p class="intro-line intro-gold">Name thy fellowship, then enter the wood.</p>
+                </div>
+                <!-- Team naming -->
+                <div id="team-name-wrap">
+                    <label for="team-name-input" class="team-label">Fellowship Name:</label>
+                    <input type="text" id="team-name-input" class="team-input"
+                           maxlength="24" placeholder="The Iron Fellowship"
+                           autocomplete="off" spellcheck="false">
                 </div>
             </section>
 
@@ -43,10 +51,11 @@
                 <div id="party-slots" role="list"></div>
             </section>
 
-            <!-- PLAY: log + stats -->
+            <!-- PLAY: log + stats + treasury -->
             <section id="screen-play" class="screen hidden">
                 <div id="game-log" role="log" aria-live="polite"></div>
                 <div id="party-stats" role="list"></div>
+                <div id="treasury-bar"></div>
             </section>
 
             <!-- END: victory or defeat -->
@@ -68,8 +77,8 @@
             <button id="btn-roll"  class="px-btn">⚄ Roll Fate [R]</button>
             <button id="btn-start" class="px-btn gold-btn">▶ Commence Journey</button>
         </div>
-        <div id="ctrl-play"  class="hidden"></div>
-        <div id="ctrl-end"   class="hidden">
+        <div id="ctrl-play" class="hidden"></div>
+        <div id="ctrl-end"  class="hidden">
             <button onclick="location.reload()" class="px-btn gold-btn">↺ Begin Anew</button>
         </div>
     </div>
