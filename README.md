@@ -15,7 +15,7 @@ adds: more music
 fixed: No more random game length
 Fixed: Variety in font size for better readability.
 
-v0.5
+v0.5 - Current 2026-03-14
 New stats & combat
 
 DEX added to all 10 races and all 24 classes. Each hero now has STR/INT/DEX visible on their stat card
@@ -35,3 +35,12 @@ Treasury: 10% chance per turn of gold/gem find with flavour text. Only affects r
 Team naming: Input on intro screen, saved with every highscore entry
 Log highlighting: Current prompt gets a gold left-border + white text; past events dim to grey
 BIND button: Glows green with layered box-shadow when a hero is locked
+
+Planned for 1.0
+More scenario variety — the 15 scenarios start repeating in a 100-turn run
+Class-specific special abilities — passive bonuses that trigger in certain scenario types (e.g. Druids get better nature outcomes, Rogues can auto-succeed on stealth checks)
+Party synergy — bonuses when certain race/class combos are in the same party
+A proper death screen with the names of fallen heroes listed
+Sound effects per damage type — fire crackle, frost tinkle, etc.
+Mobile / touch support for the controls
+Better visuals and clearer interface
