@@ -1,22 +1,15 @@
 Norrtounia - The Dark Forest
 Javascript Dungeon Crawler with random encounters.
 
-v0.01 - First release, baseline trial, couldnt run as intended in browser window, graphics didnt load.
+v0.6
+Added portraits from a sprite sheet. Moved charcters out from the text area. Will most likely create better sprites in the future.
 
-v0.05 - Up and running with graphics, incorrect size of fonts, out of bounds and no sound. 
+v0.51
+Added a sitemap to the repo
+Fixed a typo
 
-v0.1 - Bugs removed, buttons changed, music added.
-
-v0.2-v0.4 
-adds: level progression to your characters (xp-system)
-adds: actual functionality to all stats
-adds: a way to name your team
-adds: more music
-fixed: No more random game length
-Fixed: Variety in font size for better readability.
-
-v0.5 - 2026-03-14
-New stats & combat
+v0.5
+Major updates
 
 DEX added to all 10 races and all 24 classes. Each hero now has STR/INT/DEX visible on their stat card
 Hero counter-attacks first in every fight using their class's named attack (e.g. "Dunstan uses Smite Evil!") with a coloured damage span (fire=orange, frost=cyan, shadow=purple, holy=gold, etc.)
@@ -36,9 +29,22 @@ Team naming: Input on intro screen, saved with every highscore entry
 Log highlighting: Current prompt gets a gold left-border + white text; past events dim to grey
 BIND button: Glows green with layered box-shadow when a hero is locked
 
-v0.51 - 2026-03-15
-Added a sitemap to the repo
-Fixed a typo
+v0.2-v0.4 
+adds: level progression to your characters (xp-system)
+adds: actual functionality to all stats
+adds: a way to name your team
+adds: more music
+fixed: No more random game length
+Fixed: Variety in font size for better readability.
+
+v0.1 - Bugs removed, buttons changed, music added.
+
+v0.05 - Up and running with graphics, incorrect size of fonts, out of bounds and no sound. 
+
+v0.01 - First release, baseline trial, couldnt run as intended in browser window, graphics didnt load.
+
+Start - 2026-03-13
+
 
 Planned for the future:
 
