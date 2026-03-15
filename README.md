@@ -38,6 +38,7 @@ BIND button: Glows green with layered box-shadow when a hero is locked
 
 v0.51 - 2026-03-15
 Added a sitemap to the repo
+Fixed a typo
 
 Planned for the future:
 
