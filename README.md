@@ -51,7 +51,9 @@ Planned for the future:
 Character control and use of skills. Ability to select actions in more detail. (Big gameplay change)
 Characters and monsters should have initiative modifier (Big gameplay change)
 More scenario variety — the 15 scenarios start repeating in a 100-turn run
-Class-specific special abilities — passive bonuses that trigger in certain scenario types (e.g. Druids get better nature outcomes, Rogues can auto-succeed on stealth checks) Make some stronger skills take x turns to reload if used. 
+Class-specific special abilities — passive bonuses that trigger in certain scenario types (e.g. Druids get better nature outcomes, Rogues can auto-succeed on stealth checks) Make some stronger skills take x turns to reload if used.
+Add gender differences in stats.
+Add more type of stats (charisma)
 More item slots
 Party synergy — bonuses when certain race/class combos are in the same party
 A proper death screen with the names of fallen heroes listed
