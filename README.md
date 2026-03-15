@@ -64,4 +64,8 @@ Add some concepts of strategy and planning, so its less just random
 Add resistances to types of damage
 Add team affecting spells (both positive and negative)
 Add more graphics
+Add steps of actions where nothing happens more than the team walking. Too much is going on now.
+Maybe add a map that plots and redo the central screen to procedural svg graphics.
+Add alignments because of actions - good neutral evil. This will affect new scenarios and also be shown in high score.
 Increase the gameplay window or at least move some UI out from it.
+Make icons and description for gold and gems better. Make Gems more valuable.
