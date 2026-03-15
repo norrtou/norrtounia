@@ -51,6 +51,7 @@ Sound effects per damage type — fire crackle, frost tinkle, etc.
 Mobile / touch support for the controls
 Better visuals and clearer interface
 Fix music bugging out and stopping
+Fix icon to be better selected for each class
 Add some concepts of strategy and planning, so its less just random
 Add resistances to types of damage
 Add team affecting spells (both positive and negative)
