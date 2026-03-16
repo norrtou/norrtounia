@@ -85,3 +85,5 @@ A beter way to see text in text box
 A way to choose a character skill and make this visible
 Fix the great honk of death sprite (bugged)
 Add more empty turns without monster encounters
+add more choices of paths to go
+big: add more static graphics like images of ruins, forests, trees, campfires connected to the events instead of icons 
