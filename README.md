@@ -1,6 +1,11 @@
 Norrtounia - The Dark Forest
 Javascript Dungeon Crawler with random encounters.
 
+v0.9 - added Sprites for monsters and more tool tips
+
+v0.81 - Fixed crashing bug
+v0.8 - added class specific skills
+
 v0.7 
 Major core gameplay mechanics change. More stats, more resistances, individual control, initiative, morality and so on. Stats and resistances now show in tooltip. More variation in scenarios also.
 
