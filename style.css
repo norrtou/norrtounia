@@ -603,3 +603,83 @@ body {
 }
 .setup-ability-hint:hover .setup-tooltip { display:block; }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   v0.95 additions
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Portrait strip: centred by default, shifts left when monster present ── */
+#portrait-strip {
+    justify-content: center;   /* override previous space-between */
+    transition: justify-content 0s;
+}
+#portrait-strip.has-monster {
+    justify-content: space-between;
+}
+
+/* ── Status badge fix: ensure visibility ── */
+.status-row {
+    display:     flex;
+    flex-wrap:   wrap;
+    gap:         2px;
+    margin-top:  3px;
+}
+.status-badge {
+    font-size:      clamp(4px, 0.45vw, 6.5px);
+    white-space:    nowrap;
+    text-shadow:    1px 1px 0 #000;
+    background:     rgba(0,0,0,0.45);
+    padding:        1px 3px;
+    border-radius:  2px;
+    letter-spacing: 0.3px;
+}
+
+/* ── Game log: spacer between dialogue groups ── */
+#game-log p.log-spacer {
+    margin:  0;
+    padding: 0;
+    height:  0.7em;
+    color:   transparent;
+    border:  none;
+    pointer-events: none;
+    flex-shrink: 0;
+}
+
+/* ── Inline item/spell tooltips in the log ── */
+.log-item-tip {
+    position:    relative;
+    cursor:      help;
+    text-decoration: underline dotted rgba(201,162,39,0.55);
+    display:     inline;
+}
+.log-item-tip:hover .log-inline-tip { display: block; }
+.log-inline-tip {
+    display:        none;
+    position:       absolute;
+    bottom:         calc(100% + 3px);
+    left:           50%;
+    transform:      translateX(-50%);
+    z-index:        600;
+    min-width:      130px;
+    max-width:      200px;
+    background:     rgba(8,6,4,0.97);
+    border:         1px solid rgba(201,162,39,0.50);
+    padding:        5px 8px;
+    font-size:      clamp(5px,0.52vw,7.5px);
+    line-height:    1.8;
+    color:          var(--pale);
+    text-shadow:    1px 1px 0 #000;
+    white-space:    normal;
+    pointer-events: none;
+    box-shadow:     0 3px 12px rgba(0,0,0,0.85);
+}
+
+
+/* ── v0.95 layout fix: single centred row for all portrait cards ── */
+#portrait-strip {
+    justify-content: center !important;  /* always centred */
+    flex-wrap: nowrap;
+    gap: 4px;
+}
+/* Remove the two-container split — strip-heroes/strip-monster no longer used */
+.strip-heroes, .strip-monster, .strip-monster-empty { display: contents; }

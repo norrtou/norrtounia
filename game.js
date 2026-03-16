@@ -75,7 +75,7 @@ const SFX={
     bad:()=>{tone(160,'sawtooth',0.14,0.07);tone(120,'sawtooth',0.22,0.07,0.10);tone(90,'sawtooth',0.18,0.05,0.28);},
     neutral:()=>tone(380,'triangle',0.14,0.04),
     loot:()=>{[523,659,784,1047].forEach((f,i)=>tone(f,'sine',0.12,0.04,i*0.07));},
-    heal:()=>tone(440,'sine',0.18,0.03),
+    heal:()=>{tone(528,'sine',0.22,0.04);tone(660,'sine',0.18,0.03,0.10);tone(792,'sine',0.14,0.03,0.22);},
     crit:()=>{tone(550,'square',0.08,0.07);tone(880,'sine',0.18,0.06,0.06);tone(1100,'sine',0.12,0.05,0.16);},
     strike:()=>{tone(180,'sawtooth',0.10,0.07);tone(140,'sawtooth',0.20,0.06,0.06);},
     heavyHit:()=>{tone(100,'sawtooth',0.18,0.08);tone(70,'sawtooth',0.28,0.07,0.10);tone(50,'square',0.20,0.06,0.25);},
@@ -85,11 +85,113 @@ const SFX={
     charm:()=>{tone(880,'sine',0.12,0.04);tone(1108,'sine',0.20,0.04,0.10);tone(660,'sine',0.18,0.03,0.25);},
     flee:()=>{tone(330,'triangle',0.08,0.04);tone(440,'triangle',0.12,0.04,0.08);},
     treasury:()=>{[660,784,880].forEach((f,i)=>tone(f,'sine',0.15,0.04,i*0.08));},
-    victory:()=>{[[523,0],[659,.18],[784,.36],[1047,.54],[784,.80],[880,.96],[1047,1.18],[1397,1.40]].forEach(([f,t])=>tone(f,'sine',0.22,0.05,t));},
-    death:()=>{[220,185,147,110].forEach((f,i)=>tone(f,'sawtooth',0.4+i*0.1,0.07,i*0.38));},
+
+    /* Spell-type sounds — called from resolveHeroHit by damage type */
+    spellLightning:()=>{
+        // crackling burst: rapid high-pitched pops + low rumble
+        try{const ctx=actx();
+        [0,0.03,0.07,0.12,0.17].forEach(w=>{
+            const o=ctx.createOscillator(),g=ctx.createGain();
+            o.type='sawtooth';o.frequency.value=800+Math.random()*1200;
+            g.gain.setValueAtTime(0.08,ctx.currentTime+w);
+            g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+w+0.04);
+            o.connect(g);g.connect(ctx.destination);o.start(ctx.currentTime+w);o.stop(ctx.currentTime+w+0.05);
+        });
+        tone(80,'sawtooth',0.35,0.06,0.05);}catch(_){}
+    },
+    spellFire:()=>{
+        // whoosh + crackle: noise-like sawtooth swells
+        [180,240,320].forEach((f,i)=>tone(f,'sawtooth',0.18,0.06,i*0.06));
+        tone(600,'sawtooth',0.12,0.04,0.12);
+    },
+    spellFrost:()=>{
+        // glassy high tones descending
+        [1047,880,740,622].forEach((f,i)=>tone(f,'sine',0.14,0.04,i*0.07));
+        tone(220,'triangle',0.25,0.03,0.20);
+    },
+    spellHoly:()=>{
+        // bright bell-like chord
+        [523,659,784,1047].forEach((f,i)=>tone(f,'sine',0.20,0.05,i*0.04));
+        tone(1319,'sine',0.18,0.04,0.18);
+    },
+    spellPoison:()=>{
+        // low gooey bubbling pulses
+        [110,90,75].forEach((f,i)=>tone(f,'sawtooth',0.22,0.06,i*0.09));
+        tone(200,'triangle',0.15,0.03,0.25);
+    },
+    spellShadow:()=>{
+        // dark resonant drone + flutter
+        tone(55,'sawtooth',0.40,0.07);
+        [220,180,140].forEach((f,i)=>tone(f,'square',0.14,0.04,0.05+i*0.08));
+    },
+    spellNecrotic:()=>{
+        // hollow descending moan
+        [330,261,220,185].forEach((f,i)=>tone(f,'sawtooth',0.18,0.05,i*0.10));
+        tone(65,'sawtooth',0.35,0.06,0.30);
+    },
+    spellArcane:()=>{
+        // shimmering ascending glitter
+        [440,554,659,784,880].forEach((f,i)=>tone(f,'sine',0.12,0.04,i*0.05));
+    },
+    spellNature:()=>{
+        // earthy thud + rising flute
+        tone(80,'triangle',0.25,0.06);
+        [392,494,587].forEach((f,i)=>tone(f,'triangle',0.15,0.04,0.08+i*0.07));
+    },
+    spellBlood:()=>{
+        // brutal thud + whipping
+        tone(60,'sawtooth',0.30,0.08);
+        tone(300,'sawtooth',0.15,0.06,0.08);
+        tone(200,'sawtooth',0.12,0.05,0.18);
+    },
+    spellVoid:()=>{
+        // deep rumble + distorted screech
+        tone(40,'sawtooth',0.45,0.07);
+        tone(1200,'sawtooth',0.10,0.04,0.10);
+        tone(800,'sawtooth',0.08,0.03,0.22);
+    },
+    spellPsychic:()=>{
+        // high warble sine waves
+        [880,1108,660,880].forEach((f,i)=>tone(f,'sine',0.14,0.04,i*0.06));
+        tone(440,'triangle',0.20,0.03,0.22);
+    },
+
+    /* Victory — triumphant fanfare with harmony */
+    victory:()=>{
+        // Melody
+        [[523,0],[659,.14],[784,.28],[1047,.44],[784,.64],[880,.80],[1047,.96],[1319,1.12],[1047,1.36],[784,1.52]].forEach(([f,t])=>tone(f,'sine',0.22,0.06,t));
+        // Harmony a third below
+        [[392,0],[523,.14],[659,.28],[784,.44],[659,.64],[784,.80]].forEach(([f,t])=>tone(f,'triangle',0.14,0.04,t));
+        // Bass drum hits
+        [0,0.44,0.96,1.52].forEach(t=>tone(55,'sawtooth',0.20,0.08,t));
+    },
+
+    /* Death — longer mournful dirge, clearly different from victory */
+    death:()=>{
+        // Slow descending toll
+        [[330,0],[294,.50],[261,1.0],[220,1.60],[185,2.30],[147,3.10]].forEach(([f,t])=>tone(f,'triangle',0.50,0.06,t));
+        // Low drone
+        tone(55,'sawtooth',3.50,0.05,0.20);
+        // Muffled drum
+        [0,0.80,1.80].forEach(t=>tone(60,'sawtooth',0.25,0.07,t));
+    },
+
     honk:()=>{try{const ctx=actx(),o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(220,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(440,ctx.currentTime+0.25);o.frequency.exponentialRampToValueAtTime(330,ctx.currentTime+0.50);g.gain.setValueAtTime(0,ctx.currentTime);g.gain.linearRampToValueAtTime(0.14,ctx.currentTime+0.04);g.gain.setValueAtTime(0.14,ctx.currentTime+0.28);g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.55);o.connect(g);g.connect(actx().destination);o.start();o.stop(ctx.currentTime+0.55);}catch(_){}},
     doubleHonk:()=>{SFX.honk();setTimeout(SFX.honk,620);},
 };
+
+/** Play the appropriate spell sound for a damage type */
+function playSfxForDmgType(dmgType){
+    const map={
+        lightning:'spellLightning',fire:'spellFire',frost:'spellFrost',
+        holy:'spellHoly',poison:'spellPoison',shadow:'spellShadow',
+        necrotic:'spellNecrotic',arcane:'spellArcane',nature:'spellNature',
+        blood:'spellBlood',void:'spellVoid',psychic:'spellPsychic',
+    };
+    const fn=map[dmgType];
+    if(fn&&SFX[fn]) SFX[fn]();
+    else SFX.strike();
+}
 
 /* ═══════════════════════════════════════════════════════════════
    3. MUSIC — 5 synthesised tracks
@@ -97,14 +199,188 @@ const SFX={
 let bgStarted=false,bgMaster=null;
 const N={A2:110,B2:123.5,C3:130.8,D3:146.8,E3:164.8,F3:174.6,Fs3:185,G3:196,A3:220,Bb3:233.1,B3:246.9,C4:261.6,Cs4:277.2,D4:293.7,E4:329.6,F4:349.2,Fs4:370,G4:392,A4:440,B4:493.9,C5:523.3,D5:587.3,E5:659.3,G5:784};
 const MUSIC_TRACKS=[
-    {bpm:78,melVol:1.0,bassVol:0.55,melType:'square',bassType:'triangle',mel:[[N.A3,1],[N.C4,.5],[N.D4,.5],[N.E4,1],[N.D4,1],[N.C4,1],[N.B3,.5],[N.A3,.5],[N.B3,1],[N.G3,1],[N.A3,1],[N.B3,.5],[N.C4,.5],[N.D4,1],[N.C4,1],[N.B3,1],[N.A3,.5],[N.G3,.5],[N.A3,2],[N.E4,1],[N.D4,.5],[N.E4,.5],[N.F4,1],[N.E4,1],[N.D4,1],[N.C4,.5],[N.B3,.5],[N.A3,1],[N.B3,1],[N.C4,1],[N.D4,1],[N.E4,.5],[N.D4,.5],[N.C4,1],[N.B3,1],[N.A3,1],[N.G3,1],[N.A3,.5],[N.B3,.5],[N.A3,3]],bass:[[N.A2,4],[N.E3,4],[N.G3,2],[N.A2,2],[N.A2,4],[N.G3,4],[N.E3,4],[N.A2,4]]},
-    {bpm:62,melVol:0.85,bassVol:0.50,melType:'square',bassType:'triangle',mel:[[N.D4,2],[N.C4,1],[N.Bb3,1],[N.A3,2],[N.G3,1],[N.A3,1],[N.D4,2],[N.F3,1],[N.G3,1],[N.A3,4],[N.C4,2],[N.Bb3,1],[N.A3,1],[N.G3,2],[N.F3,2],[N.G3,2],[N.A3,2],[N.D3,4],[N.A3,1],[N.Bb3,1],[N.C4,2],[N.Bb3,1],[N.A3,1],[N.G3,2],[N.F3,2],[N.G3,1],[N.A3,1],[N.D3,4]],bass:[[N.D3,4],[N.C3,4],[N.Bb2,4],[N.A2,4],[N.D3,4],[N.A2,4],[N.Bb2,2],[N.C3,2],[N.D3,4]]},
-    {bpm:96,melVol:0.90,bassVol:0.45,melType:'square',bassType:'triangle',mel:[[N.G3,.5],[N.A3,.5],[N.B3,1],[N.D4,1],[N.E4,.5],[N.D4,.5],[N.B3,1],[N.A3,1],[N.G3,.5],[N.B3,.5],[N.D4,1],[N.G4,2],[N.E4,1],[N.D4,1],[N.C4,.5],[N.D4,.5],[N.E4,1],[N.D4,1],[N.C4,.5],[N.B3,.5],[N.A3,1],[N.G3,1],[N.B3,.5],[N.A3,.5],[N.G3,1],[N.D4,2],[N.B3,1],[N.A3,1],[N.G3,2],[N.D4,.5],[N.E4,.5],[N.Fs4,1],[N.G4,1],[N.E4,.5],[N.D4,.5],[N.B3,2],[N.A3,.5],[N.B3,.5],[N.C4,1],[N.D4,2],[N.C4,1],[N.B3,1],[N.A3,2]],bass:[[N.G3,2],[N.D3,2],[N.C3,2],[N.G3,2],[N.G3,2],[N.C3,2],[N.D3,4],[N.G3,2],[N.D3,2],[N.C3,2],[N.G3,2]]},
-    {bpm:55,melVol:0.80,bassVol:0.55,melType:'square',bassType:'triangle',mel:[[N.B3,2],[N.A3,1],[N.Fs3,1],[N.E3,2],[N.D3,1],[N.E3,1],[N.Fs3,2],[N.A3,2],[N.B3,4],[N.D4,2],[N.B3,1],[N.A3,1],[N.Fs3,2],[N.E3,2],[N.D3,2],[N.E3,1],[N.Fs3,1],[N.B2,4],[N.B3,1],[N.A3,1],[N.G3,1],[N.Fs3,1],[N.E3,2],[N.D3,2],[N.E3,2],[N.Fs3,2],[N.B2,4]],bass:[[N.B2,4],[N.A2,4],[N.Fs3,4],[N.B2,4],[N.B2,4],[N.E3,4],[N.Fs3,2],[N.B2,6]]},
-    {bpm:70,melVol:0.90,bassVol:0.50,melType:'square',bassType:'triangle',mel:[[N.E4,1.5],[N.D4,.5],[N.E4,1],[N.Cs4,1],[N.B3,2],[N.A3,1],[N.B3,.5],[N.Cs4,.5],[N.D4,1],[N.E4,1],[N.Fs4,1],[N.G4,1],[N.A4,2],[N.G4,1],[N.Fs4,1],[N.E4,2],[N.D4,2],[N.B3,1],[N.Cs4,1],[N.D4,2],[N.B3,1],[N.A3,1],[N.E3,2],[N.Fs3,1],[N.G3,1],[N.A3,2],[N.B3,1],[N.Cs4,1],[N.D4,2],[N.E4,1],[N.D4,1],[N.Cs4,1],[N.B3,1],[N.A3,4]],bass:[[N.E3,4],[N.A3,4],[N.Fs3,4],[N.E3,4],[N.A2,4],[N.B2,4],[N.E3,4],[N.A2,4]]},
+/*
+ * 7 medieval-fantasy tracks.  Each has:
+ *   mel   = lead melody (square wave — lute/flute feel)
+ *   bass  = bass line (triangle — viol/bass lute)
+ *   chord = optional sustained harmony (triangle, soft)
+ * Notes are [freq_Hz, beats].  BPM sets the tempo.
+ */
+
+/* ── Track 1: Tavern Reel ─ G major, lively 108 BPM ── */
+{
+  bpm:108, melVol:1.0, bassVol:0.50, melType:'square', bassType:'triangle',
+  mel:[
+    [N.G4,0.5],[N.A4,0.5],[N.B4,0.5],[N.G4,0.5],[N.D4,1],[N.B3,0.5],[N.D4,0.5],
+    [N.G4,0.5],[N.Fs4,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,1],[N.A4,0.5],[N.G4,0.5],
+    [N.D4,0.5],[N.E4,0.5],[N.Fs4,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,0.5],[N.D5,1],
+    [N.C5,0.5],[N.B4,0.5],[N.A4,0.5],[N.G4,0.5],[N.Fs4,0.5],[N.E4,0.5],[N.D4,1],
+    [N.G4,0.5],[N.B4,0.5],[N.D5,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,0.5],[N.G4,1],
+    [N.E4,0.5],[N.Fs4,0.5],[N.G4,0.5],[N.A4,0.5],[N.B4,1.5],[N.A4,0.5],
+    [N.G4,0.5],[N.Fs4,0.5],[N.E4,0.5],[N.D4,0.5],[N.G3,0.5],[N.A3,0.5],[N.B3,2],
+  ],
+  bass:[
+    [N.G3,1],[N.D3,1],[N.G3,1],[N.D3,1],
+    [N.C3,1],[N.G3,1],[N.C3,1],[N.G3,1],
+    [N.D3,1],[N.A3,1],[N.D3,1],[N.G3,1],
+    [N.G3,2],[N.D3,2],
+  ]
+},
+
+/* ── Track 2: Bard's Lament ─ D minor, slow 66 BPM ── */
+{
+  bpm:66, melVol:0.90, bassVol:0.48, melType:'square', bassType:'triangle',
+  mel:[
+    [N.D4,2],[N.C4,1],[N.Bb3,1],[N.A3,1.5],[N.G3,0.5],[N.A3,1],
+    [N.F3,1],[N.G3,1],[N.A3,2],[N.Bb3,1],[N.A3,1],
+    [N.D4,1.5],[N.C4,0.5],[N.Bb3,1],[N.A3,1],[N.G3,2],
+    [N.A3,1],[N.Bb3,0.5],[N.C4,0.5],[N.D4,1.5],[N.C4,0.5],[N.Bb3,1],[N.A3,1],
+    [N.G3,1],[N.A3,1],[N.F3,2],[N.D3,4],
+  ],
+  bass:[
+    [N.D3,2],[N.A2,2],[N.Bb2,2],[N.F2,2],
+    [N.C3,2],[N.G2,2],[N.A2,2],[N.D3,2],
+    [N.D3,4],[N.A2,4],
+  ]
+},
+
+/* ── Track 3: Knight's March ─ C major, steady 84 BPM ── */
+{
+  bpm:84, melVol:0.95, bassVol:0.55, melType:'square', bassType:'triangle',
+  mel:[
+    [N.C4,1],[N.E4,1],[N.G4,1],[N.E4,0.5],[N.D4,0.5],[N.C4,2],
+    [N.F3,1],[N.A3,1],[N.C4,1],[N.A3,0.5],[N.G3,0.5],[N.F3,2],
+    [N.G3,1],[N.B3,1],[N.D4,1],[N.B3,0.5],[N.A3,0.5],[N.G3,1],[N.A3,1],
+    [N.C4,1],[N.E4,1],[N.G4,2],[N.E4,1],[N.C4,1],
+    [N.D4,1],[N.F4,1],[N.A4,1],[N.G4,1],[N.E4,1],[N.C4,1],
+    [N.G3,1],[N.C4,2],[N.B3,1],[N.A3,1],[N.G3,2],
+  ],
+  bass:[
+    [N.C3,2],[N.G3,2],[N.F3,2],[N.C3,2],
+    [N.G3,2],[N.D3,2],[N.C3,4],
+    [N.A2,2],[N.E3,2],[N.F3,2],[N.C3,2],[N.G3,4],
+  ]
+},
+
+/* ── Track 4: Forest Wandering ─ A minor pentatonic, 72 BPM ── */
+{
+  bpm:72, melVol:0.88, bassVol:0.45, melType:'square', bassType:'triangle',
+  mel:[
+    [N.A3,1.5],[N.C4,0.5],[N.E4,1],[N.D4,0.5],[N.C4,0.5],[N.A3,2],
+    [N.G3,1],[N.A3,0.5],[N.C4,0.5],[N.E4,1.5],[N.C4,0.5],[N.A3,1],
+    [N.E4,1],[N.G4,1],[N.A4,1.5],[N.G4,0.5],[N.E4,1],[N.C4,1],
+    [N.A3,0.5],[N.C4,0.5],[N.E4,1],[N.C4,1],[N.A3,1],[N.G3,1],[N.A3,2],
+    [N.C4,1],[N.E4,0.5],[N.G4,0.5],[N.E4,1],[N.C4,1],[N.A3,2],
+    [N.G3,1.5],[N.A3,0.5],[N.C4,1],[N.A3,3],
+  ],
+  bass:[
+    [N.A2,4],[N.E3,4],[N.G3,2],[N.A2,2],
+    [N.C3,4],[N.E3,4],[N.A2,4],[N.G2,4],
+  ]
+},
+
+/* ── Track 5: Dark Portent ─ B natural minor, brooding 58 BPM ── */
+{
+  bpm:58, melVol:0.85, bassVol:0.55, melType:'square', bassType:'triangle',
+  mel:[
+    [N.B3,2],[N.A3,1],[N.G3,1],[N.Fs3,2],[N.E3,2],
+    [N.D3,1],[N.E3,1],[N.Fs3,2],[N.G3,1],[N.A3,1],
+    [N.B3,3],[N.A3,1],[N.G3,1],[N.Fs3,1],
+    [N.E3,2],[N.Fs3,1],[N.G3,1],[N.B2,4],
+    [N.B3,1],[N.D4,1],[N.Cs4,1],[N.B3,1],[N.A3,2],[N.G3,2],
+    [N.Fs3,1],[N.E3,1],[N.D3,1],[N.Cs3,1],[N.B2,4],
+  ],
+  bass:[
+    [N.B2,4],[N.E3,4],[N.G3,4],[N.Fs3,2],[N.E3,2],
+    [N.A2,4],[N.B2,4],[N.E3,4],[N.B2,4],
+  ]
+},
+
+/* ── Track 6: Village Green ─ F major, cheerful 100 BPM ── */
+{
+  bpm:100, melVol:0.92, bassVol:0.48, melType:'square', bassType:'triangle',
+  mel:[
+    [N.F4,1],[N.G4,1],[N.A4,0.5],[N.Bb4,0.5],[N.C5,1],[N.A4,1],
+    [N.Bb4,0.5],[N.A4,0.5],[N.G4,1],[N.F4,2],[N.G4,1],
+    [N.A4,1],[N.Bb4,0.5],[N.C5,0.5],[N.D5,1],[N.C5,1],
+    [N.Bb4,0.5],[N.A4,0.5],[N.G4,1],[N.F4,3],
+    [N.C4,1],[N.E4,1],[N.G4,1],[N.F4,0.5],[N.E4,0.5],[N.D4,1],[N.C4,1],
+    [N.A3,0.5],[N.Bb3,0.5],[N.C4,1],[N.F4,3],
+  ],
+  bass:[
+    [N.F3,2],[N.C3,2],[N.Bb2,2],[N.F3,2],
+    [N.C3,2],[N.G3,2],[N.F3,2],[N.C3,2],
+    [N.F3,4],[N.C3,4],
+  ]
+},
+
+/* ── Track 7: Ancient Mystery ─ E Dorian, 68 BPM, 3-voice ── */
+{
+  bpm:68, melVol:0.92, bassVol:0.50, melType:'square', bassType:'triangle',
+  mel:[
+    [N.E4,1.5],[N.Fs4,0.5],[N.G4,1],[N.A4,1],[N.B4,1],[N.A4,1],
+    [N.G4,1],[N.Fs4,0.5],[N.E4,0.5],[N.D4,1],[N.Cs4,1],[N.B3,2],
+    [N.Cs4,1],[N.D4,1],[N.E4,1.5],[N.Fs4,0.5],[N.G4,1],[N.A4,1],
+    [N.B4,2],[N.A4,1],[N.G4,1],[N.Fs4,1],[N.E4,1],
+    [N.G4,1],[N.A4,1],[N.B4,1.5],[N.A4,0.5],[N.G4,1],[N.Fs4,1],
+    [N.E4,1],[N.D4,1],[N.Cs4,2],[N.B3,1],[N.A3,1],[N.E3,2],
+  ],
+  bass:[
+    [N.E3,4],[N.A3,4],[N.Fs3,4],[N.B2,4],
+    [N.G3,4],[N.D3,4],[N.A2,4],[N.E3,4],
+  ]
+},
 ];
-function startBgMusic(){if(bgStarted)return;bgStarted=true;bgMaster=actx().createGain();bgMaster.gain.value=0.0196;bgMaster.connect(actx().destination);playNextTrack();}
-function playNextTrack(){const ctx=actx(),track=pick(MUSIC_TRACKS),B=60/track.bpm;function sv(notes,t0,type,vol,sus=0.78){let t=t0;notes.forEach(([freq,beats])=>{const dur=beats*B*sus,o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+0.018);g.gain.setValueAtTime(vol*0.65,t+dur*0.55);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(bgMaster);o.start(t);o.stop(t+dur);t+=beats*B;});}const t0=ctx.currentTime+0.25,mb=track.mel.reduce((s,[,d])=>s+d,0),bb=track.bass.reduce((s,[,d])=>s+d,0);sv(track.mel,t0,track.melType,track.melVol,0.80);sv(track.bass,t0,track.bassType,track.bassVol,0.60);setTimeout(playNextTrack,(Math.max(mb,bb)*B-0.10)*1000);}
+function startBgMusic(){
+    if(bgStarted)return;
+    bgStarted=true;
+    bgMaster=actx().createGain();
+    bgMaster.gain.value=0.0196;
+    bgMaster.connect(actx().destination);
+    scheduleNextTrack(actx().currentTime+0.10);
+}
+
+/**
+ * Schedule a track starting at audioStartTime.
+ * When it finishes, immediately schedule another random track.
+ * Using the audio clock (not wall clock) for gapless looping.
+ */
+function scheduleNextTrack(audioStartTime){
+    const ctx=actx();
+    // Resume if suspended (browser focus change etc.)
+    if(ctx.state==='suspended') ctx.resume();
+
+    const track=pick(MUSIC_TRACKS);
+    const B=60/track.bpm;
+
+    function sv(notes,vol,type,sus=0.80){
+        let t=audioStartTime;
+        notes.forEach(([freq,beats])=>{
+            const dur=beats*B*sus;
+            const o=ctx.createOscillator(),g=ctx.createGain();
+            o.type=type; o.frequency.value=freq;
+            g.gain.setValueAtTime(0,t);
+            g.gain.linearRampToValueAtTime(vol,t+0.018);
+            g.gain.setValueAtTime(vol*0.65,t+dur*0.55);
+            g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+            o.connect(g); g.connect(bgMaster);
+            o.start(t); o.stop(t+dur);
+            t+=beats*B;
+        });
+    }
+
+    const melBeats =track.mel.reduce((s,[,d])=>s+d,0);
+    const bassBeats=track.bass.reduce((s,[,d])=>s+d,0);
+    const trackLen =Math.max(melBeats,bassBeats)*B;
+
+    sv(track.mel,  track.melVol,  track.melType,  0.80);
+    sv(track.bass, track.bassVol, track.bassType, 0.65);
+
+    // Schedule next track using audio clock — no drift, no gaps
+    const nextStart=audioStartTime+trackLen;
+    const msUntilNext=(nextStart - ctx.currentTime)*1000;
+    setTimeout(()=>scheduleNextTrack(nextStart), Math.max(0, msUntilNext-50));
+}
 
 /* ═══════════════════════════════════════════════════════════════
    4. SCREEN SHAKE
@@ -419,7 +695,9 @@ function renderPortraitStrip(){
         </div>`;
     }
 
-    strip.innerHTML=`<div class="strip-heroes">${heroHTML}</div><div class="strip-monster">${monsterHTML}</div>`;
+    const hasMon = battle.active && battle.monster && battle.monster.currentHp > 0;
+    // Single centred flex row: heroes then monster side by side
+    strip.innerHTML = heroHTML + (hasMon ? monsterHTML : '');
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -642,7 +920,7 @@ function resolveHeroHit(hero,hi,atkName,mult,overrideDmgType=null){
     battle.monster.currentHp=Math.max(0,battle.monster.currentHp-dmg);
     const critSpan=isCrit?` <span style="color:#ffe033">✦ CRIT!</span>`:'';
     logHTML(`${hero.name} — ${atkName}: <span style="color:${dmgInfo.color}">${dmg} ${dmgInfo.label}</span>${critSpan}`);
-    if(isCrit)SFX.crit();else(battle.monster.str>24?SFX.heavyHit():SFX.strike());
+    if(isCrit)SFX.crit();playSfxForDmgType(dmgType);
     if(isCrit||battle.monster.str>24)shake();
     return dmg;
 }
@@ -717,9 +995,37 @@ function endGame(won){
    ═══════════════════════════════════════════════════════════════ */
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');const strip=document.getElementById('portrait-strip');const show=id!=='screen-intro';strip.classList.toggle('hidden',!show);if(show)renderPortraitStrip();}
 function showCtrl(id){['ctrl-intro','ctrl-setup','ctrl-play','ctrl-end'].forEach(c=>document.getElementById(c).classList.toggle('hidden',c!==id));}
-function logPrompt(text){document.querySelectorAll('#game-log .prompt-current').forEach(p=>p.classList.remove('prompt-current'));const el=document.getElementById('game-log'),p=document.createElement('p');p.className='prompt-current';p.textContent=text;el.insertAdjacentElement('afterbegin',p);}
+function logPrompt(text){
+    document.querySelectorAll('#game-log .prompt-current').forEach(p=>p.classList.remove('prompt-current'));
+    const el=document.getElementById('game-log');
+    // Blank separator line before new prompt so dialogue groups are visually distinct
+    const sep=document.createElement('p');sep.className='log-spacer';sep.innerHTML='&nbsp;';
+    el.insertAdjacentElement('afterbegin',sep);
+    const p=document.createElement('p');p.className='prompt-current';p.textContent=text;
+    el.insertAdjacentElement('afterbegin',p);
+}
 function log(text,style='pale'){document.querySelectorAll('#game-log .log-recent').forEach(p=>p.classList.remove('log-recent'));const el=document.getElementById('game-log'),p=document.createElement('p');p.classList.add('log-recent');if(style==='blood')p.classList.add('log-blood');p.style.color=style==='blood'?'var(--blood)':style==='dim'?'var(--dim)':'var(--pale)';p.textContent=text;el.insertAdjacentElement('afterbegin',p);}
-function logHTML(html){document.querySelectorAll('#game-log .log-recent').forEach(p=>p.classList.remove('log-recent'));const el=document.getElementById('game-log'),p=document.createElement('p');p.classList.add('log-recent');p.style.color='var(--pale)';p.innerHTML=html;el.insertAdjacentElement('afterbegin',p);}
+function logHTML(html){
+    document.querySelectorAll('#game-log .log-recent').forEach(p=>p.classList.remove('log-recent'));
+    const el=document.getElementById('game-log'),p=document.createElement('p');
+    p.classList.add('log-recent');p.style.color='var(--pale)';
+    p.innerHTML=enrichLogHTML(html);
+    el.insertAdjacentElement('afterbegin',p);
+}
+
+/**
+ * Add inline tooltip spans to item names and damage type labels found in HTML.
+ * Item names are matched against GAME_DATA.items; damage types against DAMAGE_TYPES.
+ */
+function enrichLogHTML(html){
+    // Wrap known item names with a tooltip
+    GAME_DATA.items.forEach(item=>{
+        const esc=item.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        const re=new RegExp(`(${esc})`,'g');
+        html=html.replace(re,`<span class="log-item-tip">$1<span class="log-inline-tip">✦ ${item.name}<br>+${item.val} ${item.stat.toUpperCase()}</span></span>`);
+    });
+    return html;
+}
 function setChoices(choices){const el=document.getElementById('ctrl-play');el.innerHTML='';choices.forEach(c=>{const btn=document.createElement('button');btn.className=`px-btn${c.isGated?' gated-btn':''}`;btn.textContent=c.label;if(c.disabled)btn.classList.add('ability-cooldown');btn.addEventListener('click',()=>{el.querySelectorAll('button').forEach(b=>b.disabled=true);c.action();});el.appendChild(btn);});}
 function clearChoices(){document.getElementById('ctrl-play').innerHTML='';}
 function renderStats(){detectPartyLeader();renderPortraitStrip();}
