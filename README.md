@@ -83,4 +83,4 @@ Add character screen for monster encounter
 A better way to see initiative
 A beter way to see text in text box
 A way to choose a character skill and make this visible
-Make sure monster skills and attacks show in tool tip
+Fix the great honk of death sprite (bugged)
