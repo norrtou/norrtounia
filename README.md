@@ -84,3 +84,4 @@ A better way to see initiative
 A beter way to see text in text box
 A way to choose a character skill and make this visible
 Fix the great honk of death sprite (bugged)
+Add more empty turns without monster encounters
