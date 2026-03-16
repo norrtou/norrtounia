@@ -515,55 +515,91 @@ body {
 .gold-btn:hover { border-color:var(--amber); color:var(--amber); }
 #ctrl-play .px-btn { white-space:normal; text-align:left; }
 
-/* ═════════════════════════════════════════
-   v0.7 ADDITIONS
-   ═════════════════════════════════════════ */
-
-/* ── Initiative / new portrait info lines ── */
-.pi-init {
-    color:       var(--amber);
-    font-size:   clamp(4px, 0.50vw, 7px);
-    display:     block;
-    white-space: nowrap;
-}
-
-/* ── Leader crown overlay ── */
-.leader-crown {
-    position:      absolute;
-    top:           -7px;
-    left:          50%;
-    transform:     translateX(-50%);
-    font-size:     clamp(10px, 1.2vw, 14px);
-    line-height:   1;
-    pointer-events:none;
-    filter:        drop-shadow(0 1px 2px rgba(0,0,0,0.9));
-}
-
-/* ── Stat hover tooltip ── */
-.stat-tooltip {
-    display:      none;
-    position:     absolute;
-    top:          calc(100% + 4px);
-    left:         0;
-    z-index:      500;
-    min-width:    190px;
-    max-width:    240px;
-    background:   rgba(8,6,4,0.97);
-    border:       1px solid rgba(201,162,39,0.45);
-    padding:      7px 9px;
-    font-size:    clamp(5px, 0.55vw, 7.5px);
-    line-height:  1.9;
-    color:        var(--pale);
-    text-shadow:  1px 1px 0 #000;
-    white-space:  normal;
-    word-break:   break-word;
-    pointer-events:none;
-    box-shadow:   0 4px 16px rgba(0,0,0,0.80);
-}
+/* ═══ v0.8 additions ═══ */
+.ability-hint { font-size:clamp(5px,0.50vw,7px) !important; color:#8866cc !important; letter-spacing:0.5px; }
+.gated-btn { border-color:rgba(201,162,39,0.65) !important; color:var(--amber) !important; background:rgba(14,10,3,0.95) !important; }
+.gated-btn:hover { border-color:var(--amber) !important; color:#fff !important; }
+.ability-cooldown { opacity:0.50; cursor:not-allowed !important; border-color:rgba(80,60,30,0.30) !important; color:var(--dim) !important; }
+.ability-cooldown:hover { border-color:rgba(80,60,30,0.30) !important; color:var(--dim) !important; background:rgba(12,8,4,0.92) !important; }
+.leader-crown { position:absolute; top:-7px; left:50%; transform:translateX(-50%); font-size:clamp(10px,1.2vw,14px); line-height:1; pointer-events:none; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.9)); }
+.stat-tooltip { display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:500; min-width:190px; max-width:240px; background:rgba(8,6,4,0.97); border:1px solid rgba(201,162,39,0.45); padding:7px 9px; font-size:clamp(5px,0.55vw,7.5px); line-height:1.9; color:var(--pale); text-shadow:1px 1px 0 #000; white-space:normal; word-break:break-word; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,0.80); }
 .portrait-card:hover .stat-tooltip { display:block; }
+.pi-init { color:var(--amber); font-size:clamp(4px,0.50vw,7px); display:block; white-space:nowrap; }
 
-/* ── Active-turn highlight during combat ── */
-.portrait-card.active-turn {
-    border-color: rgba(201,162,39,0.70) !important;
-    box-shadow:   0 0 10px rgba(201,162,39,0.35);
+/* ═══════════════════════════════════════════════════════════════
+   v0.9 — Monster portrait + status badges + split strip layout
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Portrait strip: heroes left, monster right */
+#portrait-strip {
+    display:        flex;
+    justify-content:space-between;
+    align-items:    stretch;
+    gap:            4px;
 }
+
+.strip-heroes {
+    display:     flex;
+    gap:         4px;
+    flex-shrink: 0;
+}
+
+.strip-monster {
+    display:     flex;
+    align-items: stretch;
+    flex-shrink: 0;
+}
+
+.strip-monster-empty {
+    width:  4px;   /* invisible placeholder keeps layout stable */
+}
+
+/* Monster portrait card — mirror of hero card, red-tinted */
+.monster-card {
+    border-color: rgba(138,0,0,0.45) !important;
+    background:   rgba(20,0,0,0.75) !important;
+}
+.monster-card:hover { border-color: rgba(200,60,30,0.70) !important; }
+
+.pi-monster-name {
+    color:     var(--blood) !important;
+    font-size: clamp(5px,0.65vw,9px);
+}
+
+/* Monster tooltip opens to the LEFT so it doesn't overflow right edge */
+.monster-tooltip {
+    left:  auto !important;
+    right: 0 !important;
+}
+
+/* Status badges row */
+.status-row {
+    display:   block;
+    margin-top:2px;
+    line-height:1.5;
+}
+.status-badge {
+    display:        inline-block;
+    font-size:      clamp(4px,0.42vw,6px);
+    margin-right:   3px;
+    white-space:    nowrap;
+    text-shadow:    1px 1px 0 #000;
+    letter-spacing: 0.3px;
+}
+
+/* Ability tooltip on setup cards — opens upward */
+.setup-ability-hint {
+    position: relative;
+    cursor:   help;
+}
+.setup-tooltip {
+    bottom:  calc(100% + 4px) !important;
+    top:     auto !important;
+    left:    50% !important;
+    transform: translateX(-50%);
+    min-width:180px;
+    max-width:260px;
+    text-align:left;
+}
+.setup-ability-hint:hover .setup-tooltip { display:block; }
+
