@@ -73,3 +73,5 @@ Display in character box what skill it used or is affected by. Stat-icons.
 Make icons and description for gold and gems better. Make Gems more valuable.
 Make more tooltips, like for items
 Add character screen for monster encounter
+A better way to see initiative
+A beter way to see text in text box
