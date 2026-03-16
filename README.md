@@ -51,12 +51,8 @@ Start - 2026-03-13
 
 Planned for the future:
 
-Character control and use of skills. Ability to select actions in more detail. (Big gameplay change)
-Characters and monsters should have initiative modifier (Big gameplay change)
-More scenario variety — the 15 scenarios start repeating in a 100-turn run
 Class-specific special abilities — passive bonuses that trigger in certain scenario types (e.g. Druids get better nature outcomes, Rogues can auto-succeed on stealth checks) Make some stronger skills take x turns to reload if used.
 Add gender differences in stats.
-Add more type of stats (charisma)
 More item slots
 Party synergy — bonuses when certain race/class combos are in the same party
 A proper death screen with the names of fallen heroes listed
@@ -75,3 +71,5 @@ Add alignments because of actions - good neutral evil. This will affect new scen
 Increase the gameplay window or at least move some UI out from it.
 Display in character box what skill it used or is affected by. Stat-icons.
 Make icons and description for gold and gems better. Make Gems more valuable.
+Make more tooltips, like for items
+Add character screen for monster encounter
