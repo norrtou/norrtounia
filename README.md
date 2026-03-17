@@ -92,3 +92,4 @@ Encounter more than one
 More clearer choices on hard choices giving better bonuses but more danger. 
 Need a resurrect action, with 10 turn cooldown
 Need negative consequence on more actions and bonuses on other
+Must show more clearer who has the turn by marking it with some icon. Maybe redo the concept of leadership.
