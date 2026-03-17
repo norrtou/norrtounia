@@ -92,3 +92,5 @@ big: add more static graphics like images of ruins, forests, trees, campfires co
 More monster types, variety of same monster
 Encounter more than one
 More clearer choices on hard choices giving better bonuses but more danger. 
+Need a resurrect action, with 10 turn cooldown
+Need negative consequence on more actions and bonuses on other
