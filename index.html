@@ -8,35 +8,35 @@
     <title>Norrtounia: The Dark Forest</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- ══ TITLE ══ -->
-    <header id="site-header">
-        <h1 id="game-title">NORRTOUNIA</h1>
-        <p id="game-sub">The Dark Forest v0.95</p>
-    </header>
+<!--
+  Layout (all same width, centred on page):
+    #title-row  = [#hero-panel flex-end | #site-header shrink-0 | #monster-panel flex-start]
+    #game-area  = frame.jpg
+    #controls   = buttons
+-->
 
-    <!--
-        #game-area holds portrait-strip + frame-wrap in a single flex column,
-        so both always share the same width.
-    -->
+<div id="layout-wrap">
+
+    <div id="title-row">
+        <div id="hero-panel" role="list" aria-label="Party members"></div>
+        <header id="site-header">
+            <h1 id="game-title">NORRTOUNIA</h1>
+            <p id="game-sub">The Dark Forest <span id="version">v1.0</span></p>
+        </header>
+        <div id="monster-panel" role="complementary" aria-label="Enemy"></div>
+    </div>
+
     <div id="game-area">
-
-        <!-- ══ PORTRAIT STRIP — above the frame, always same width ══
-             Hidden on intro screen. Populated by JS.
-             Each .portrait-card shows a sprite + stats for one hero. -->
-        <div id="portrait-strip" class="hidden" role="list" aria-label="Party members"></div>
-
-        <!-- ══ FRAME — frame.jpg background ══ -->
+        <div id="portrait-strip" class="hidden" role="list"></div>
         <div id="frame-wrap">
             <div id="fog" aria-hidden="true"></div>
-
             <main id="game-window" role="main">
 
-                <!-- INTRO: lore + team naming -->
                 <section id="screen-intro" class="screen">
                     <div id="intro-text">
                         <p class="intro-line intro-gold">✦ Hear Ye, Brave Adventurer ✦</p>
@@ -47,7 +47,7 @@
                         <p class="intro-line">Monsters stalk the trails. Strange magic lingers in the glades. Treasure of gold and precious gems awaiteth the bold.</p>
                         <p class="intro-line intro-dim">Should thy fellowship survive all one hundred trials, thy ranking shall be decided by the treasury gathered along the way.</p>
                         <p class="intro-line intro-dim">Beware above all else the sound of a distant <em>honk</em>. Thou shalt know it when it cometh.</p>
-                        <p class="intro-line intro-gold">Name thy fellowship, then enter the wood.</p>
+                        <p class="intro-line intro-gold">Name thy fellowship, then enter the forest.</p>
                     </div>
                     <div id="team-name-wrap">
                         <label for="team-name-input" class="team-label">Fellowship Name:</label>
@@ -57,19 +57,15 @@
                     </div>
                 </section>
 
-                <!-- SETUP: compact slot cards — portrait shown in the strip above -->
                 <section id="screen-setup" class="screen hidden">
                     <div id="party-slots" role="list"></div>
                 </section>
 
-                <!-- PLAY: only the game log and turn/treasury info.
-                     Character stats live in the portrait strip above. -->
                 <section id="screen-play" class="screen hidden">
                     <div id="game-log" role="log" aria-live="polite" aria-atomic="false"></div>
                     <div id="treasury-bar"></div>
                 </section>
 
-                <!-- END: victory or defeat -->
                 <section id="screen-end" class="screen hidden">
                     <h2 id="end-title"></h2>
                     <div id="end-flavour"></div>
@@ -77,14 +73,12 @@
                 </section>
 
             </main>
-        </div><!-- /frame-wrap -->
+        </div>
+    </div>
 
-    </div><!-- /game-area -->
-
-    <!-- ══ CONTROLS — below frame, same width as game-area ══ -->
     <div id="controls">
         <div id="ctrl-intro">
-            <button id="btn-enter" class="px-btn gold-btn">▶ Enter the Wood</button>
+            <button id="btn-enter" class="px-btn gold-btn">▶ Enter the Forest</button>
         </div>
         <div id="ctrl-setup" class="hidden">
             <button id="btn-roll"  class="px-btn">⚄ Roll Fate [R]</button>
@@ -96,7 +90,9 @@
         </div>
     </div>
 
-    <script src="data.js"></script>
-    <script src="game.js"></script>
+</div><!-- /layout-wrap -->
+
+<script src="data.js"></script>
+<script src="game.js"></script>
 </body>
 </html>

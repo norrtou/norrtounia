@@ -13,6 +13,40 @@
 
 'use strict';
 
+/* ══ GLOBAL TOOLTIP — one floating div, avoids all overflow:hidden clipping ══ */
+let _nttEl=null;
+function nttEl(){
+    if(!_nttEl){
+        _nttEl=document.createElement('div');
+        _nttEl.id='ntt';
+        _nttEl.style.cssText='display:none;position:fixed;z-index:9999;max-width:280px;min-width:150px;background:#000;border:1px solid rgba(201,162,39,0.75);padding:8px 11px;font-family:\'IM Fell English\',Georgia,serif;font-size:14px;line-height:1.65;color:#fff;pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,0.92);text-align:left;white-space:normal;';
+        document.body.appendChild(_nttEl);
+    }
+    return _nttEl;
+}
+function showTip(el,html){
+    el.addEventListener('mouseenter',e=>{
+        const t=nttEl();
+        t.innerHTML=html;
+        t.style.display='block';
+        placeTip(e);
+    });
+    el.addEventListener('mousemove',placeTip);
+    el.addEventListener('mouseleave',()=>{nttEl().style.display='none';});
+}
+function placeTip(e){
+    const t=nttEl(),W=window.innerWidth,H=window.innerHeight;
+    const tw=t.offsetWidth||240,th=t.offsetHeight||100;
+    let x=e.clientX+14,y=e.clientY-10;
+    if(x+tw>W-8)x=e.clientX-tw-10;
+    if(y+th>H-8)y=H-th-8;
+    if(y<4)y=4;
+    t.style.left=x+'px';t.style.top=y+'px';
+}
+/* colour helpers for tooltip content */
+const C={stat:'#88ccff',hp:'#6abf45',item:'#c9a227',skill:'#e879f9',lore:'#bbbbbb',warn:'#ff7733',good:'#6abf45',blood:'#cc2222'};
+function tc(color,text){return `<span style="color:${C[color]||color}">${text}</span>`;}
+
 /* ═══════════════════════════════════════════════════════════════
    1. PORTRAIT SPRITE SYSTEM
    ═══════════════════════════════════════════════════════════════ */
@@ -330,7 +364,13 @@ const MUSIC_TRACKS=[
     [N.G3,4],[N.D3,4],[N.A2,4],[N.E3,4],
   ]
 },
+,
+{bpm:96,melVol:0.95,bassVol:0.60,melType:'square',bassType:'sawtooth',mel:[[440,1],[349,.5],[440,.5],[392,1],[330,1],[294,.5],[330,.5],[349,1],[494,2],[440,.5],[392,.5],[294,1],[262,1],[440,1],[330,1],[294,2]],bass:[[147,1],[110,1],[147,1],[110,1],[175,2],[147,2],[110,2]]},
+{bpm:60,melVol:0.85,bassVol:0.40,melType:'square',bassType:'triangle',mel:[[440,2],[277,1],[330,1],[440,1.5],[494,.5],[554,1],[440,2],[370,1],[330,1],[294,1.5],[247,1],[220,1],[330,2],[220,4]],bass:[[110,4],[165,4],[147,4],[110,4],[165,4],[123,4]]},
+{bpm:55,melVol:0.90,bassVol:0.60,melType:'sawtooth',bassType:'sawtooth',mel:[[247,2],[349,2],[165,2],[233,2],[220,1],[294,1],[196,2],[262,1],[294,2],[175,1],[156,3],[110,1]],bass:[[123,4],[116,4],[110,4],[98,4]]},
 ];
+let currentMood='normal';
+function setMusicMood(m){currentMood=m;}
 function startBgMusic(){
     if(bgStarted)return;
     bgStarted=true;
@@ -346,40 +386,59 @@ function startBgMusic(){
  * Using the audio clock (not wall clock) for gapless looping.
  */
 function scheduleNextTrack(audioStartTime){
-    const ctx=actx();
-    // Resume if suspended (browser focus change etc.)
-    if(ctx.state==='suspended') ctx.resume();
+    try{
+        const ctx=actx();
 
-    const track=pick(MUSIC_TRACKS);
-    const B=60/track.bpm;
+        // Resume if suspended — then retry from current time
+        if(ctx.state==='suspended'){
+            ctx.resume().then(()=>scheduleNextTrack(ctx.currentTime+0.20));
+            return;
+        }
 
-    function sv(notes,vol,type,sus=0.80){
-        let t=audioStartTime;
-        notes.forEach(([freq,beats])=>{
-            const dur=beats*B*sus;
-            const o=ctx.createOscillator(),g=ctx.createGain();
-            o.type=type; o.frequency.value=freq;
-            g.gain.setValueAtTime(0,t);
-            g.gain.linearRampToValueAtTime(vol,t+0.018);
-            g.gain.setValueAtTime(vol*0.65,t+dur*0.55);
-            g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-            o.connect(g); g.connect(bgMaster);
-            o.start(t); o.stop(t+dur);
-            t+=beats*B;
-        });
+        // Clamp start to at least 150ms ahead so o.start() never fires on a past time
+        const safeStart = Math.max(audioStartTime, ctx.currentTime + 0.15);
+
+        const pool=currentMood==='battle'
+            ?[MUSIC_TRACKS[0],MUSIC_TRACKS[2],MUSIC_TRACKS[7]]
+            :currentMood==='tense'
+            ?[MUSIC_TRACKS[7],MUSIC_TRACKS[9],MUSIC_TRACKS[4]]
+            :[...MUSIC_TRACKS.slice(0,9)];
+        const track=pick(pool);
+        const B=60/track.bpm;
+
+        function sv(notes,vol,type,sus=0.80){
+            let t=safeStart;
+            notes.forEach(([freq,beats])=>{
+                try{
+                    const dur=beats*B*sus;
+                    const o=ctx.createOscillator(),g=ctx.createGain();
+                    o.type=type; o.frequency.value=freq;
+                    g.gain.setValueAtTime(0,t);
+                    g.gain.linearRampToValueAtTime(vol,t+0.018);
+                    g.gain.setValueAtTime(vol*0.65,t+dur*0.55);
+                    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+                    o.connect(g); g.connect(bgMaster);
+                    o.start(t); o.stop(t+dur);
+                }catch(noteErr){/* skip bad note, keep scheduling */}
+                t+=beats*B;
+            });
+        }
+
+        const melBeats=track.mel.reduce((s,[,d])=>s+d,0);
+        const bassBeats=track.bass.reduce((s,[,d])=>s+d,0);
+        const trackLen=Math.max(melBeats,bassBeats)*B;
+
+        sv(track.mel,  track.melVol,  track.melType,  0.80);
+        sv(track.bass, track.bassVol, track.bassType, 0.65);
+
+        const nextStart=safeStart+trackLen;
+        const msUntilNext=(nextStart-ctx.currentTime)*1000;
+        // Always schedule next track — minimum 200ms buffer to avoid rapid re-fire
+        setTimeout(()=>scheduleNextTrack(nextStart), Math.max(200, msUntilNext-100));
+    }catch(err){
+        // If anything fails, retry after 2 seconds rather than stopping forever
+        setTimeout(()=>scheduleNextTrack(actx().currentTime+0.20), 2000);
     }
-
-    const melBeats =track.mel.reduce((s,[,d])=>s+d,0);
-    const bassBeats=track.bass.reduce((s,[,d])=>s+d,0);
-    const trackLen =Math.max(melBeats,bassBeats)*B;
-
-    sv(track.mel,  track.melVol,  track.melType,  0.80);
-    sv(track.bass, track.bassVol, track.bassType, 0.65);
-
-    // Schedule next track using audio clock — no drift, no gaps
-    const nextStart=audioStartTime+trackLen;
-    const msUntilNext=(nextStart - ctx.currentTime)*1000;
-    setTimeout(()=>scheduleNextTrack(nextStart), Math.max(0, msUntilNext-50));
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -559,7 +618,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
 });
 
-function enterWood(){startBgMusic();SFX.start();const inp=document.getElementById('team-name-input');teamName=(inp?.value.trim())||'The Unnamed Fellowship';showScreen('screen-setup');showCtrl('ctrl-setup');}
+function enterWood(){
+    startBgMusic();SFX.start();
+    const inp=document.getElementById('team-name-input');
+    teamName=(inp?.value.trim())||'The Unnamed Fellowship';
+    showScreen('screen-setup');showCtrl('ctrl-setup');
+}
 
 /* ═══════════════════════════════════════════════════════════════
    8. PARTY GENERATION
@@ -623,82 +687,208 @@ function renderSetup(){
    Status badges, HP colours, initiative, hover tooltips.
    ═══════════════════════════════════════════════════════════════ */
 
-function heroStatusBadges(hi){
-    const tags=[];
-    if((battle.heroShielded[hi]||0)>0)   tags.push({label:'🛡 Shielded', col:'#88ccff'});
-    if((battle.heroPhaseShift[hi]||0)>0) tags.push({label:'👁 Phased',   col:'#b47afe'});
-    if(battle.heroRegen[hi])             tags.push({label:'💚 Regen',     col:'#6abf45'});
-    if((battle.heroRage[hi]||0)>0)       tags.push({label:'🔥 Rage',      col:'#ff7733'});
-    if(battle.heroDmgMult[hi])           tags.push({label:'⬆ Buffed',    col:'#ffe033'});
-    if(battle.inspiredHero===hi)         tags.push({label:'🎵 Inspired',  col:'#e879f9'});
-    if(battle.combustPrimed[hi])         tags.push({label:'💣 Primed',    col:'#ff7733'});
-    if(battle.judgmentPrimed[hi])        tags.push({label:'⚖ Judged',    col:'#ffd700'});
-    return tags;
+/* =========================================================
+   9. PORTRAIT PANELS v1.0
+   Card order: crown | sprite+status-overlay | hp-bar | name | class+lvl | icons
+   ========================================================= */
+
+function itemIcon(name){
+    const n=name||'';
+    if(/axe|pick/i.test(n))return '🪓';
+    if(/mace|hammer/i.test(n))return '🔨';
+    if(/sword|blade|claymore|shiv/i.test(n))return '⚔';
+    if(/staff|wand/i.test(n))return '🪄';
+    if(/orb|crystal/i.test(n))return '🔮';
+    if(/scroll|tome|grimoire|codex/i.test(n))return '📜';
+    if(/bow|quiver/i.test(n))return '🏹';
+    if(/ring/i.test(n))return '💍';
+    if(/amulet|crown|circlet/i.test(n))return '📿';
+    if(/gloves|gauntlet/i.test(n))return '🥊';
+    if(/boots/i.test(n))return '👢';
+    if(/cloak|cape|sash/i.test(n))return '🧣';
+    if(/vest|tunic|plate|armour|armor/i.test(n))return '🛡';
+    if(/shield|aegis/i.test(n))return '🛡';
+    if(/helm|helmet/i.test(n))return '⛑';
+    if(/belt/i.test(n))return '🪢';
+    if(/chain/i.test(n))return '⛓';
+    if(/bandage|salve/i.test(n))return '🩹';
+    return '✦';
 }
-function monsterStatusBadges(){
-    const tags=[];
-    if(battle.monsterSkipTurns>0)        tags.push({label:`❄ Stun(${battle.monsterSkipTurns})`, col:'#88eeff'});
-    if(battle.monster?.charmed)          tags.push({label:'💕 Charmed',   col:'#e879f9'});
-    if(battle.monsterResistNullified)    tags.push({label:'🕳 Nullified', col:'#7755dd'});
-    if(battle.monsterAtkMultRounds>0){const pct=Math.round((1-battle.monsterAtkMult)*100);tags.push({label:`⬇ATK-${pct}%`,col:'#88ccff'});}
-    if(battle.dotEffects.some(d=>!d.targetType||d.targetType==='monster')) tags.push({label:'☠ Poisoned',col:'#6abf45'});
-    return tags;
+
+function heroStatusIcons(hi){
+    const t=[];
+    if((battle.heroShielded[hi]||0)>0)   t.push({icon:'🛡',tip:'<span style="color:#88ccff">Shielded</span> — next hit absorbed'});
+    if((battle.heroPhaseShift[hi]||0)>0) t.push({icon:'👁',tip:'<span style="color:#b47afe">Phase Shift</span> — untargetable'});
+    if(battle.heroRegen[hi])             t.push({icon:'💚',tip:'<span style="color:#6abf45">Regenerating</span> HP each round'});
+    if((battle.heroRage[hi]||0)>0)       t.push({icon:'🔥',tip:'<span style="color:#ff7733">Rage</span> — +70% damage'});
+    if(battle.heroDmgMult[hi])           t.push({icon:'⬆',tip:'<span style="color:#ffe033">Damage buffed</span>'});
+    if(battle.inspiredHero===hi)         t.push({icon:'🎵',tip:'<span style="color:#e879f9">Inspired</span> — next attack 2×'});
+    if(battle.combustPrimed[hi])         t.push({icon:'💣',tip:'<span style="color:#ff7733">Combustion primed</span>'});
+    if(battle.judgmentPrimed[hi])        t.push({icon:'⚖',tip:'<span style="color:#ffd700">Judgment</span> marked'});
+    return t;
+}
+function monsterStatusIcons(){
+    const t=[];
+    if(battle.monsterSkipTurns>0)         t.push({icon:'❄',tip:`<span style="color:#88eeff">Stunned</span> ${battle.monsterSkipTurns} turn(s)`});
+    if(battle.monster?.charmed)           t.push({icon:'💕',tip:'<span style="color:#e879f9">Charmed</span>'});
+    if(battle.monsterResistNullified)     t.push({icon:'🕳',tip:'<span style="color:#7755dd">Resistances nullified</span>'});
+    if(battle.monsterAtkMultRounds>0){const p=Math.round((1-battle.monsterAtkMult)*100);t.push({icon:'⬇',tip:`<span style="color:#88ccff">ATK −${p}%</span>`});}
+    if(battle.dotEffects.some(d=>!d.targetType||d.targetType==='monster'))t.push({icon:'☠',tip:'<span style="color:#6abf45">DoT active</span>'});
+    return t;
+}
+
+function buildCard(spr,data){
+    const{id,name,sublabel,hpPct,hpCol,dead,isLeader,isMonster,items,statusIcons,statTip,hpTip}=data;
+    const hpW=Math.max(0,Math.min(100,hpPct)).toFixed(1);
+    const cardCls=(isMonster?'portrait-card monster-card':'portrait-card')+(dead?' portrait-dead':'');
+    const crownHTML=isLeader?'<div class="leader-crown">👑</div>':'';
+    const deadHTML=dead?'<div class="portrait-dead-x">✝</div>':'';
+    const statusHTML=statusIcons.map(s=>`<span class="status-icon" data-tip="${s.tip.replace(/"/g,'&quot;')}">${s.icon}</span>`).join('');
+    const itemHTML=(items||[]).slice(-4).map(n=>{
+        const ic=itemIcon(n);
+        const it=GAME_DATA.items.find(x=>x.name===n);
+        const tip=it?`<span style="color:var(--gold)">✦ ${n}</span><br>+${it.val} <span style="color:#88ccff">${it.stat.toUpperCase()}</span>`:n;
+        return `<span class="pi-item-icon" data-itemname="${n.replace(/"/g,'&quot;')}">${ic}</span>`;
+    }).join('');
+    const nameCls=isMonster?'pi-name pi-name-monster':'pi-name';
+    return `<div class="${cardCls}" id="${id}">
+        ${crownHTML}
+        <div class="portrait-sprite-wrap">
+            <div class="portrait-sprite" style="${spr}"></div>
+            ${deadHTML}
+            <div class="status-overlay">${statusHTML}</div>
+        </div>
+        <div class="portrait-hp-wrap">
+            <div class="portrait-hp-bar" style="width:${hpW}%;background:${hpCol}"></div>
+            <span class="hp-tip">${hpTip}</span>
+        </div>
+        ${dead
+          ? `<span class="pi-dead">✝ Slain</span>`
+          : `<span class="${nameCls}">${name}<span class="stat-tooltip">${statTip}</span></span>
+             <span class="pi-sub">${sublabel}<span class="stat-tooltip">${statTip}</span></span>
+             <div class="pi-items">${itemHTML}</div>`
+        }
+    </div>`;
+}
+
+function portraitStyleSized(hero,dW,dH){
+    const P=PORTRAIT,rc=P.RACE_COL[hero.race]??{male:0,female:1};
+    const col=hero.gender===0?rc.male:rc.female;
+    const arch=P.CLASS_ARCHETYPE[hero.job]??'warrior';
+    const row=(P.ARCHETYPE_ROW[arch]??[0,0])[hero.gender??0];
+    const srcX=P.COL_X[col]??0,srcY=P.ROW_Y[row]??0,srcW=P.COL_W[col]??80,srcH=P.ROW_H[row]??100;
+    const sx=dW/srcW,sy=dH/srcH;
+    return `background-image:url('portraits.png');background-repeat:no-repeat;background-size:${(P.SHEET_W*sx).toFixed(1)}px ${(P.SHEET_H*sy).toFixed(1)}px;background-position:${-(srcX*sx).toFixed(1)}px ${-(srcY*sy).toFixed(1)}px;image-rendering:pixelated;width:${dW}px;height:${dH}px`;
+}
+function monsterPortraitStyleSized(idx,dW,dH){
+    const P=MPORTRAIT;
+    const col=idx%P.COLS,row=Math.floor(idx/P.COLS);
+    if(row>=P.ROW_Y.length||col>=P.COL_X.length)return `width:${dW}px;height:${dH}px;background:#111;`;
+    const srcX=P.COL_X[col],srcY=P.ROW_Y[row],srcW=P.COL_W[col],srcH=P.ROW_H[row];
+    const sx=dW/srcW,sy=dH/srcH;
+    return `background-image:url('monsters1.jpg');background-repeat:no-repeat;background-size:${(P.SHEET_W*sx).toFixed(1)}px ${(P.SHEET_H*sy).toFixed(1)}px;background-position:${-(srcX*sx).toFixed(1)}px ${-(srcY*sy).toFixed(1)}px;image-rendering:pixelated;width:${dW}px;height:${dH}px`;
 }
 
 function renderPortraitStrip(){
-    const strip=document.getElementById('portrait-strip');
-    if(!strip||strip.classList.contains('hidden'))return;
-
-    const heroHTML=party.map((h,i)=>{
-        const dead=h.hp<=0,spr=portraitStyle(h);
-        const hpPct=h.maxHp>0?h.hp/h.maxHp*100:0;
-        const hpCol=hpPct>55?'#6abf45':hpPct>25?'#c8a040':'#aa3333';
-        const initMod=Math.floor((h.dex+h.lck)/4);
-        const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
-        const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}: ${v>0?'+':''}${v}%`).join('<br>')||'None';
-        const abilityLines=h.abilities.map(a=>{const cd=h.abilityCooldowns[a.id]||0;return `<b>${a.name}</b>${cd>0?` (${cd}rnd)`:'  ✓'}: ${a.desc}`;}).join('<br>');
-        const tip=[`<b>${h.name}</b> Lv.${h.level} ${h.race} ${h.job}`,`STR:${h.str} INT:${h.int} DEX:${h.dex}`,`CHA:${h.cha} STA:${h.sta} LCK:${h.lck}`,`INIT: +${initMod}${h.lastInitiative?' (rolled '+h.lastInitiative+')':''}`,`Leadership: ${h.leadership} · Morality: ${moralLabel}`,`<b>Resistances:</b><br>${resLines}`,`<b>Abilities:</b><br>${abilityLines}`].join('<br>');
-        const badges=battle.active?heroStatusBadges(i):[];
-        const badgeHTML=badges.map(b=>`<span class="status-badge" style="color:${b.col}">${b.label}</span>`).join('');
-        return `<div class="portrait-card${dead?' portrait-dead':''}" id="portrait-card-${i}" role="listitem">
-            <div class="portrait-sprite-wrap"><div class="portrait-sprite" style="${spr}"></div>${dead?'<div class="portrait-dead-x">✝</div>':''}${h.isLeader?'<div class="leader-crown">👑</div>':''}</div>
-            <div class="portrait-info">
-                <span class="pi-name"><span class="pi-lv">Lv.${h.level}</span>${h.name}</span>
-                <span class="pi-sub">${h.race} · ${h.job}</span>
-                ${dead?`<span class="pi-dead">✝ SLAIN</span>`:`<span class="pi-hp" style="color:${hpCol}">HP:${h.hp}/${h.maxHp}</span><span class="pi-init">INIT:+${initMod}${h.lastInitiative?' ('+h.lastInitiative+')':''}</span><span class="pi-item">${h.items.at(-1)??'—'}</span>${badgeHTML?`<span class="status-row">${badgeHTML}</span>`:''}`}
-                <div class="stat-tooltip">${tip}</div>
-            </div>
-        </div>`;
-    }).join('');
-
-    let monsterHTML='<div class="strip-monster-empty"></div>';
-    if(battle.active&&battle.monster&&battle.monster.currentHp>0){
-        const m=battle.monster;
-        const mIdx=GAME_DATA.monsters.findIndex(x=>x.name===m.name);
-        const sIdx=m.spriteIdx??mIdx;
-        const mSpr=monsterPortraitStyle(sIdx>=0?sIdx:0);
-        const hpPct=m.maxHp>0?m.currentHp/m.maxHp*100:0;
-        const hpCol=hpPct>66?'#c84040':hpPct>33?'#c87030':'#882020';
-        const badges=monsterStatusBadges();
-        const badgeHTML=badges.map(b=>`<span class="status-badge" style="color:${b.col}">${b.label}</span>`).join('');
-        const dotInfo=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/rnd×${d.rounds}`).join(', ')||'None';
-        const tip=[`<b>${m.name}</b>`,`HP: ${m.currentHp} / ${m.maxHp}`,`ATK: ${m.str}${battle.monsterAtkMult!==1?' ×'+battle.monsterAtkMult.toFixed(2):''}`,`Initiative: ${m.initiative??'?'}`,`Battle round: ${battle.round}`,m.undead?'☠ Undead type':'',`DoT active: ${dotInfo}`,battle.monsterResistNullified?'⚠ Resistances nullified':''].filter(Boolean).join('<br>');
-        monsterHTML=`<div class="portrait-card monster-card" id="monster-card" role="listitem">
-            <div class="portrait-sprite-wrap"><div class="portrait-sprite" style="${mSpr}"></div></div>
-            <div class="portrait-info">
-                <span class="pi-name pi-monster-name">${m.icon} ${m.name}</span>
-                <span class="pi-hp" style="color:${hpCol}">HP:${m.currentHp}/${m.maxHp}</span>
-                <span class="pi-init">INIT:${m.initiative??'?'}  Rnd:${battle.round}</span>
-                ${badgeHTML?`<span class="status-row">${badgeHTML}`+'</span>':''}
-                <div class="stat-tooltip monster-tooltip">${tip}</div>
-            </div>
-        </div>`;
+    const hp=document.getElementById('hero-panel');
+    if(hp){
+        const order=party.map((h,i)=>({h,i}));
+        if(battle.active) order.sort((a,b)=>(b.h.lastInitiative||0)-(a.h.lastInitiative||0));
+        hp.innerHTML=order.map(({h,i})=>{
+            const dead=h.hp<=0;
+            const hpPct=h.maxHp>0?h.hp/h.maxHp*100:0;
+            const hpCol=hpPct>55?'#4db84d':hpPct>25?'#c8a040':'#aa2222';
+            const initMod=Math.floor((h.dex+h.lck)/4);
+            const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
+            const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}:${v>0?'+':''}${v}%`).join(' ')||'None';
+            const abilLines=h.abilities.map(a=>{const cd=h.abilityCooldowns[a.id]||0;return `<span style="color:#e879f9">${a.name}</span>${cd>0?' ('+cd+'rnd)':' ✓'}: ${a.desc}`;}).join('<br>');
+            const statTip=`<b>${h.name}</b> Lv.${h.level}<br><span style="color:#88ccff">STR:${h.str} INT:${h.int} DEX:${h.dex}<br>CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span><br>Lead:${h.leadership} · ${moralLabel}<br>INIT:+${initMod}<br><span style="color:#ff7733">Resist: ${resLines}</span><br>${abilLines}`;
+            const hpTip=`<span style="color:#6abf45">HP: ${h.hp}/${h.maxHp}</span>  XP: ${h.xp}/${h.xpNext}`;
+            const spr=portraitStyleSized(h,66,84);
+            return buildCard(spr,{
+                id:`portrait-card-${i}`,
+                name:h.name,
+                sublabel:`${h.job} · Lv.${h.level}`,
+                hpPct,hpCol,dead,isLeader:h.isLeader,isMonster:false,
+                items:h.items,statusIcons:battle.active?heroStatusIcons(i):[],
+                statTip,hpTip,
+            });
+        }).join('');
+        // Wire tooltips on each portrait card
+        order.forEach(({h,i})=>{
+            const card=document.getElementById(`portrait-card-${i}`);
+            if(!card)return;
+            const dead=h.hp<=0;
+            const initMod=Math.floor((h.dex+h.lck)/4);
+            const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
+            const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}: ${v>0?'+':''}${v}%`).join('<br>')||'None';
+            const abilLines=h.abilities.map(a=>{const cd=h.abilityCooldowns[a.id]||0;return `${tc('skill',a.name)} ${cd>0?tc('warn','('+cd+' rnd)'):'<span style="color:#6abf45">✓</span>'}: ${a.desc}`;}).join('<br>');
+            const statHtml=`<b>${h.name}</b> Lv.${h.level}<br>${tc('stat','STR:'+h.str+' INT:'+h.int+' DEX:'+h.dex)}<br>${tc('stat','CHA:'+h.cha+' STA:'+h.sta+' LCK:'+h.lck)}<br>Lead:${h.leadership} · ${moralLabel}<br>INIT:+${initMod}<br>${tc('warn','Resist: '+resLines)}<br><br>${abilLines}`;
+            const hpHtml=`${tc('hp','HP: '+h.hp+'/'+h.maxHp)}<br>XP: ${h.xp}/${h.xpNext}`;
+            const spriteEl=card.querySelector('.portrait-sprite-wrap');
+            const nameEl=card.querySelector('.pi-name');
+            const subEl=card.querySelector('.pi-sub');
+            const hpEl=card.querySelector('.portrait-hp-wrap');
+            if(spriteEl) showTip(spriteEl,statHtml);
+            if(nameEl)   showTip(nameEl,statHtml);
+            if(subEl)    showTip(subEl,statHtml);
+            if(hpEl)     showTip(hpEl,hpHtml);
+            // Item icon tooltips
+            card.querySelectorAll('.pi-item-icon').forEach(ic=>{
+                const name=ic.dataset.itemname;
+                if(!name)return;
+                const item=GAME_DATA.items.find(x=>x.name===name);
+                if(!item)return;
+                showTip(ic,`${tc('item','✦ '+item.name)}<br>+${item.val} ${tc('stat',item.stat.toUpperCase())}`);
+            });
+            // Status icon tooltips
+            card.querySelectorAll('.status-icon').forEach(ic=>{
+                const tip=ic.dataset.tip;
+                if(tip) showTip(ic,tip);
+            });
+        });
     }
-
-    const hasMon = battle.active && battle.monster && battle.monster.currentHp > 0;
-    // Single centred flex row: heroes then monster side by side
-    strip.innerHTML = heroHTML + (hasMon ? monsterHTML : '');
+    const mp=document.getElementById('monster-panel');
+    if(mp){
+        if(battle.active&&battle.monster&&battle.monster.currentHp>0){
+            const m=battle.monster;
+            const mIdx=GAME_DATA.monsters.findIndex(x=>x.name===m.name);
+            const sIdx=m.spriteIdx??(mIdx>=0?mIdx:0);
+            const spr=monsterPortraitStyleSized(sIdx,66,84);
+            const hpPct=m.maxHp>0?m.currentHp/m.maxHp*100:0;
+            const hpCol=hpPct>66?'#c84040':hpPct>33?'#b85520':'#771010';
+            const dotInfo=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r`).join(', ')||'None';
+            const statTip=`<b>${m.name}</b><br><span style="color:#ff7733">ATK:${m.str}</span> INIT:${m.initiative??'?'} Rnd:${battle.round}${m.undead?'<br>☠ Undead':''}${battle.monsterResistNullified?'<br>⚠ Nullified':''}${dotInfo!=='None'?'<br>DoT: '+dotInfo:''}`;
+            const hpTip=`<span style="color:#6abf45">HP: ${m.currentHp}/${m.maxHp}</span>`;
+            mp.innerHTML=buildCard(spr,{
+                id:'monster-card',name:m.name,
+                sublabel:`${m.icon} Round ${battle.round}`,
+                hpPct,hpCol,dead:false,isLeader:false,isMonster:true,
+                items:[],statusIcons:monsterStatusIcons(),
+                statTip,hpTip,
+            });
+        } else { mp.innerHTML=''; return; }
+        // Wire monster card tooltips
+        const mc=document.getElementById('monster-card');
+        if(mc){
+            const m=battle.monster;
+            const dotInfo=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r×${d.rounds}`).join(', ')||'None';
+            const mData=GAME_DATA.monsters.find(x=>x.name===m.name);
+            const lorePart=mData?.lore?`<br><br>${tc('lore',mData.lore)}`:'';
+            const mHtml=`${tc('item',m.name)}${lorePart}<br><br>${tc('warn','ATK: '+m.str+(battle.monsterAtkMult!==1?' ×'+battle.monsterAtkMult.toFixed(2):''))}<br>INIT: ${m.initiative??'?'} · Round: ${battle.round}${m.undead?'<br>'+tc('blood','☠ Undead'):''}${battle.monsterResistNullified?'<br>'+tc('warn','⚠ Resistances nullified'):''}${dotInfo!=='None'?'<br>DoT: '+tc('warn',dotInfo):''}`;
+            const hpHtml=`${tc('hp','HP: '+m.currentHp+'/'+m.maxHp)}`;
+            const spriteEl=mc.querySelector('.portrait-sprite-wrap');
+            const nameEl=mc.querySelector('.pi-name');
+            const hpEl=mc.querySelector('.portrait-hp-wrap');
+            if(spriteEl) showTip(spriteEl,mHtml);
+            if(nameEl)   showTip(nameEl,mHtml);
+            if(hpEl)     showTip(hpEl,hpHtml);
+            mc.querySelectorAll('.status-icon').forEach(ic=>{const tip=ic.dataset.tip;if(tip)showTip(ic,tip);});
+        }
+    }
 }
+
+
 
 /* ═══════════════════════════════════════════════════════════════
    10. GAME START & MAIN LOOP
@@ -723,9 +913,9 @@ function doTreasuryEvent(){const gold=rand(5,50),gems=Math.random()<0.35?rand(1,
 function doUneventfulTurn(){
     const ev=pick(GAME_DATA.uneventfulEvents);logPrompt(ev.text);
     setChoices([
-        {label:'[1] Press on through the wood',action:()=>{log(ev.pressOn);SFX.neutral();setTimeout(nextTurn,40);}},
-        {label:'[2] Rest and recover',action:()=>{party.forEach(h=>{if(h.hp<=0)return;const hl=Math.max(2,Math.floor(h.maxHp*(0.06+h.sta*0.003)));h.hp=Math.min(h.hp+hl,h.maxHp);log(`${h.name} rests. +${hl} HP`);});log(ev.restFlavour);SFX.heal();setTimeout(nextTurn,40);}},
-        {label:'[3] Search the surroundings',action:()=>{const best=Math.max(...party.filter(h=>h.hp>0).map(h=>h.lck));if(Math.random()<0.12+best*0.008)giveLoot();else log('Naught of value is found here.');log(ev.searchFlavour);SFX.neutral();setTimeout(nextTurn,40);}},
+        {label:'[1] Press on through the wood',tooltip:tc('lore','→ Safe — continue forward, no effect'),action:()=>{log(ev.pressOn);SFX.neutral();setTimeout(nextTurn,40);}},
+        {label:'[2] Rest and recover',action:()=>{party.forEach(h=>{if(h.hp<=0)return;const hl=Math.max(2,Math.floor(h.maxHp*(0.06+h.sta*0.003)));h.hp=Math.min(h.hp+hl,h.maxHp);log(`${h.name} rests. +${hl} HP`);});log(ev.restFlavour);SFX.heal();setTimeout(nextTurn,40);},tooltip:tc('hp','💚 Heals ~6–9% max HP')+' (STA improves this)'},
+        {label:'[3] Search the surroundings',action:()=>{const best=Math.max(...party.filter(h=>h.hp>0).map(h=>h.lck));if(Math.random()<0.12+best*0.008)giveLoot();else log('Naught of value is found here.');log(ev.searchFlavour);SFX.neutral();setTimeout(nextTurn,40);},tooltip:tc('item','🍀 ~12–25% chance to find an item')+' (LCK improves this)'},
     ]);
 }
 
@@ -734,8 +924,19 @@ function doUneventfulTurn(){
    ═══════════════════════════════════════════════════════════════ */
 function doScenario(){
     const ev=pick(GAME_DATA.scenarios);logPrompt(ev.text);
-    const choices=ev.options.map((opt,i)=>({label:`[${i+1}] ${opt.text}`,action:()=>resolveScenario(opt)}));
-    if(ev.gated){ev.gated.forEach(g=>{const hero=party.find(h=>h.hp>0&&h[g.requires.stat]>=g.requires.min);if(hero)choices.push({label:`[${choices.length+1}] [${g.requires.stat.toUpperCase()} ${g.requires.min}+] ${hero.name}: ${g.text}`,action:()=>resolveGated(hero,g),isGated:true});});}
+    const typeIcon={'good':tc('good','✦ Favourable'),'bad':tc('warn','⚠ Risky'),'neutral':tc('lore','~ Uncertain')};
+    const choices=ev.options.map((opt,i)=>{
+        const icon=typeIcon[opt.type||'neutral']||typeIcon.neutral;
+        const tip=`${icon}<br><br>${tc('lore',opt.effect||opt.text)}`+
+            (opt.damage?`<br>${tc('warn','May cause '+opt.damage+' damage')}`:'')+ 
+            (opt.bonus?`<br>${tc('good','Grants a bonus')}`:'')+ 
+            (opt.item?`<br>${tc('item','May yield an item')}`:'');
+        return {label:`[${i+1}] ${opt.text}`,tooltip:tip,action:()=>resolveScenario(opt)};
+    });
+    if(ev.gated){ev.gated.forEach(g=>{const hero=party.find(h=>h.hp>0&&h[g.requires.stat]>=g.requires.min);if(hero){
+            const gTip=`${tc('good','✦ Guaranteed success')}<br>${hero.name} meets the requirement (${g.requires.stat.toUpperCase()} ${hero[g.requires.stat]} ≥ ${g.requires.min})<br><br>${tc('lore',g.effect||g.text)}${g.bonus?'<br>'+tc('good','Grants a bonus'):''}${g.item?'<br>'+tc('item','Yields an item'):''}`;
+            choices.push({label:`[${choices.length+1}] [${g.requires.stat.toUpperCase()} ${g.requires.min}+] ${hero.name}: ${g.text}`,tooltip:gTip,action:()=>resolveGated(hero,g),isGated:true});
+        }});}
     setChoices(choices);
 }
 function resolveScenario(opt){
@@ -773,6 +974,7 @@ function doCombat(){
     resetBattle();
     battle.monster={...base,currentHp:Math.round(base.hp*scale),maxHp:Math.round(base.hp*scale),str:Math.max(1,Math.round(base.str*scale)),charmed:false,resistances:{}};
     battle.active=true;
+    setMusicMood('battle');
     logPrompt(`${battle.monster.icon} ${battle.monster.name} emerges from the shadows!`);
     if(battle.monster.taunts&&Math.random()<0.30)log(pick(battle.monster.taunts));
     const order=[];
@@ -858,14 +1060,37 @@ function showHeroAction(hero){
     const hpPct=battle.monster.currentHp/battle.monster.maxHp;
     const hpDesc=hpPct>0.75?'unharmed':hpPct>0.50?'wounded':hpPct>0.25?'badly hurt':'near death';
     log(`${battle.monster.icon} ${battle.monster.name} is ${hpDesc}. (${battle.monster.currentHp}/${battle.monster.maxHp} HP)  ${hero.isLeader?'👑 ':''}${hero.name}'s turn.`);
+
+    const sv=hero[hero.primaryStat];
+    const minD=Math.max(1,Math.floor(sv*0.50)+1+hero.bonusDmg);
+    const maxD=Math.max(1,Math.floor(sv*0.50)+Math.max(2,Math.floor(sv*0.15))+hero.bonusDmg);
+    const critP=Math.round(Math.min(35,(hero.dex+hero.lck)/240*100));
+    const mData=GAME_DATA.monsters.find(x=>x.name===battle.monster.name);
+    const mLore=mData?.lore?`<br><br>${tc('lore',mData.lore)}`:'';
+
     const choices=[];
     const atkName=pick(hero.attackNames);
-    choices.push({label:`[1] ${atkName}`,action:()=>executeAttack(hero,hi,1.0)});
+    // Basic attack tooltip — weaker but can earn morality on victory
+    const atkTip=`${tc('item','⚔ Basic attack')}<br>`+
+        `Est. damage: ${tc('stat',minD+'–'+maxD)} ${tc('lore',hero.damageType)}<br>`+
+        `Crit chance: ${tc('good',critP+'%')}<br><br>`+
+        `${tc('good','✦ Choosing basic attack when stronger skills are available')} earns +1 Morality on a killing blow.`;
+    choices.push({label:`[1] ${atkName}`,tooltip:atkTip,action:()=>executeAttackWithMorality(hero,hi,1.0,true)});
+
     hero.abilities.forEach(ab=>{
         const cd=hero.abilityCooldowns[ab.id]||0,ready=cd===0;
+        let tipColor=ready?'item':'warn';
+        // Build rich ability tooltip
+        const abTip=`${tc(tipColor,ab.name)}<br>`+
+            `${tc('skill',ab.desc)}<br><br>`+
+            (ready?`${tc('good','✓ Ready')}`:`${tc('warn','⏳ Cooldown: '+cd+' round(s) remaining')}`)+
+            `<br>Cooldown: ${ab.cooldown} rounds after use`+
+            (battle.monster.name&&mData?`<br><br>${tc('lore',mData.name)}${mLore}`:'');
         choices.push({
-            label:`[${choices.length+1}] ${ab.name}${ready?'':`  (${cd} rnd)`}  — ${ab.desc}`,
+            label:`[${choices.length+1}] ${ab.name}`+(ready?'':'  ('+cd+' rnd)')+`  — ${ab.desc}`,
             disabled:!ready,
+            cooldown:!ready,
+            tooltip:abTip,
             action:()=>{
                 if(!ready){log(`${ab.name} is on cooldown (${cd} rounds).`);SFX.neutral();advanceBattleTurn();setTimeout(processBattleTurn,300);return;}
                 hero.abilityCooldowns[ab.id]=ab.cooldown;
@@ -875,8 +1100,33 @@ function showHeroAction(hero){
             },
         });
     });
-    if(hero.isLeader)choices.push({label:`[${choices.length+1}] Attempt to flee (leader only)`,action:()=>attemptFlee(hero)});
+    if(hero.isLeader){
+        const fleeTip=`${tc('warn','Attempt to escape combat')}<br>`+
+            `~55% chance of success<br><br>`+
+            `${tc('warn','⚠ Failure: battle continues')}<br>`+
+            `${tc('warn','⚠ Success: −5 Morality (cowardice)')}<br>`+
+            `Only the party leader may attempt this.`;
+        choices.push({label:`[${choices.length+1}] Attempt to flee (leader only)`,isFlee:true,tooltip:fleeTip,action:()=>attemptFlee(hero)});
+    }
     setChoices(choices);
+}
+
+/* Basic attack with morality-on-kill reward for choosing weaker option */
+function executeAttackWithMorality(hero,hi,mult,isBasic=false){
+    resolveHeroHit(hero,hi,pick(hero.attackNames),mult);
+    if(battle.monster.currentHp<=0){
+        endCombat(true);
+        // If player used basic attack when at least one ability was available, reward morality
+        if(isBasic){
+            const hadAbility=hero.abilities.some(ab=>(hero.abilityCooldowns[ab.id]||0)===0);
+            if(hadAbility){
+                hero.morality=clamp(hero.morality+1,-100,100);
+                log(`${hero.name} dispatched the foe with honour. (Morality +1)`);
+            }
+        }
+        return;
+    }
+    advanceBattleTurn();renderStats();setTimeout(processBattleTurn,300);
 }
 
 /* ─────────────────────────────────────────────
@@ -937,7 +1187,7 @@ function finishAbilityTurn(){
 
 function attemptFlee(hero){
     log(`${hero.name} rallies the fellowship to retreat...`);
-    if(Math.random()>0.45){log(`${hero.name} leads the party to safety!`);SFX.flee();battle.active=false;setTimeout(nextTurn,500);}
+    if(Math.random()>0.45){log(`${hero.name} leads the party to safety!`);SFX.flee();hero.morality=clamp(hero.morality-5,-100,100);log(`${hero.name} bears a quiet shame at the retreat. (Morality -5)`);battle.active=false;setMusicMood('normal');setTimeout(nextTurn,500);}
     else{log(`The ${battle.monster.name} cuts off the retreat!`,'blood');SFX.bad();advanceBattleTurn();setTimeout(processBattleTurn,400);}
 }
 
@@ -946,7 +1196,7 @@ function endCombat(won){
     battle.active=false;
     if(party.every(h=>h.hp<=0))return endGame(false);
     if(won){
-        log(`${battle.monster.name} is defeated!`);SFX.good();
+        setMusicMood('normal');log(`${battle.monster.name} is defeated!`);SFX.good();
         if(Math.random()<battle.monster.loot)giveLoot();
         if(battle.monster.boon&&Math.random()<0.25){const h=aliveHero();if(h){if(battle.monster.boon.hp)h.hp=Math.min(h.hp+battle.monster.boon.hp,h.maxHp);if(battle.monster.boon.int)h.int+=battle.monster.boon.int;log(`Strange energy from ${battle.monster.name} flows into ${h.name}!`);}}
         const bXP=battle.monster.xpValue??40;
@@ -959,8 +1209,8 @@ function endCombat(won){
 /* ═══════════════════════════════════════════════════════════════
    13. THE GREAT HONK OF DEATH
    ═══════════════════════════════════════════════════════════════ */
-function doHonkEncounter(){clearChoices();SFX.doubleHonk();[{t:0,text:'The forest falleth utterly silent.',style:'pale'},{t:900,text:'A shadow crosseth the canopy overhead.',style:'pale'},{t:1900,text:'From the mists emergeth... THE GREAT HONK OF DEATH.',style:'blood'},{t:2900,text:'🪿 It regardeth thee with one terrible, ancient eye.',style:'blood'},{t:3800,text:'"Men have wept at its passing. Armies have broken and fled.',style:'dim'},{t:4600,text:'"Scholars who beheld it could not sleep for a fortnight."',style:'dim'}].forEach(({t,text,style})=>setTimeout(()=>log(text,style),t));setTimeout(()=>SFX.honk(),2800);setTimeout(()=>setChoices([{label:'[1] Stand thy ground and fight!',action:fightHonk},{label:'[2] Flee for thy very life!',action:fleeHonk}]),5400);}
-function fightHonk(){log('Thou raisest thy weapon against the eternal goose...');SFX.honk();setTimeout(()=>{if(Math.random()<0.80){party.forEach(h=>{h.hp=0;});SFX.death();shake();shake();setTimeout(()=>{log('HONK.','blood');log('Thy fellowship is unmade. The Great Honk is eternal.','blood');setTimeout(()=>endGame(false),1800);},600);}else{party.forEach(h=>{if(h.hp>0)h.hp=Math.max(1,Math.floor(h.hp*0.08));});log('The Goose... tires of thee. A miracle known to no other.');party.forEach(h=>grantXP(h,500));SFX.victory();setTimeout(nextTurn,1200);}},1200);}
+function doHonkEncounter(){setMusicMood('tense');clearChoices();SFX.doubleHonk();[{t:0,text:'The forest falleth utterly silent.',style:'pale'},{t:900,text:'A shadow crosseth the canopy overhead.',style:'pale'},{t:1900,text:'From the mists emergeth... THE GREAT HONK OF DEATH.',style:'blood'},{t:2900,text:'🪿 It regardeth thee with one terrible, ancient eye.',style:'blood'},{t:3800,text:'"Men have wept at its passing. Armies have broken and fled.',style:'dim'},{t:4600,text:'"Scholars who beheld it could not sleep for a fortnight."',style:'dim'}].forEach(({t,text,style})=>setTimeout(()=>log(text,style),t));setTimeout(()=>SFX.honk(),2800);setTimeout(()=>setChoices([{label:'[1] Stand thy ground and fight!',action:fightHonk},{label:'[2] Flee for thy very life!',action:fleeHonk}]),5400);}
+function fightHonk(){log('Thou raisest thy weapon against the eternal goose...');SFX.honk();setTimeout(()=>{if(Math.random()<0.80){party.forEach(h=>{h.hp=0;});SFX.death();shake();shake();setTimeout(()=>{log('HONK.','blood');log('Thy fellowship is unmade. The Great Honk is eternal.','blood');setTimeout(()=>endGame(false),1800);},600);}else{party.forEach(h=>{if(h.hp>0)h.hp=Math.max(1,Math.floor(h.hp*0.08));});log('The Goose... tires of thee. A miracle known to no other.');party.forEach(h=>grantXP(h,500));treasury.gems=(treasury.gems||0)+1;treasury.honkSlain=true;log('A precious gem falls from the heavens!');SFX.victory();setTimeout(nextTurn,1200);}},1200);}
 function fleeHonk(){log('Thou turnest and runnest as thou hast never run before!');SFX.flee();setTimeout(()=>{if(Math.random()<0.50){log('Somehow, impossibly, thou escapest. The honk fades...');setTimeout(nextTurn,800);}else{log('THE GREAT HONK FINDETH THEE.','blood');SFX.doubleHonk();setTimeout(fightHonk,1200);}},900);}
 
 /* ═══════════════════════════════════════════════════════════════
@@ -984,7 +1234,7 @@ function endGame(won){
     if(won){SFX.victory();titleEl.textContent='✦ VICTORY ✦';flavourEl.textContent=pick(GAME_DATA.victoryLines)+` Treasury: ${treasury.gold} gold · ${treasury.gems} gems · ${wealth} gold value.`;}
     else{SFX.death();titleEl.textContent='✧ DEFEAT ✧';flavourEl.textContent=pick(GAME_DATA.defeatLines);}
     const scores=JSON.parse(localStorage.getItem('norrt_scores')||'[]');
-    scores.push({team:teamName,turns:turn,won,gold:treasury.gold,gems:treasury.gems,wealth,date:new Date().toLocaleDateString('sv-SE')});
+    scores.push({team:teamName,turns:turn,won,gold:treasury.gold,gems:treasury.gems,wealth,honkSlain:!!treasury.honkSlain,date:new Date().toLocaleDateString('sv-SE')});
     scores.sort((a,b)=>{if(a.won!==b.won)return a.won?-1:1;if(a.won)return b.wealth-a.wealth;return b.turns-a.turns;});
     localStorage.setItem('norrt_scores',JSON.stringify(scores.slice(0,50)));
     document.getElementById('highscore-list').innerHTML=scores.map((s,i)=>{const icon=s.won?'✦':'✧',colour=s.won?'var(--gold)':'var(--dim)';const detail=s.won?`${s.turns} trials · ${s.wealth} gold`:`${s.turns} trials`;return `<p style="color:${colour}">${i+1}. ${icon} ${s.team} · ${detail} · ${s.date}</p>`;}).join('');
@@ -993,24 +1243,31 @@ function endGame(won){
 /* ═══════════════════════════════════════════════════════════════
    16. RENDER & UTILITIES
    ═══════════════════════════════════════════════════════════════ */
-function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');const strip=document.getElementById('portrait-strip');const show=id!=='screen-intro';strip.classList.toggle('hidden',!show);if(show)renderPortraitStrip();}
+function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    const show=id!=='screen-intro';
+    const hp=document.getElementById('hero-panel');
+    const mp=document.getElementById('monster-panel');
+    if(hp)hp.style.display=show?'flex':'none';
+    if(mp)mp.style.display=show?'flex':'none';
+    if(show)renderPortraitStrip();
+}
 function showCtrl(id){['ctrl-intro','ctrl-setup','ctrl-play','ctrl-end'].forEach(c=>document.getElementById(c).classList.toggle('hidden',c!==id));}
 function logPrompt(text){
     document.querySelectorAll('#game-log .prompt-current').forEach(p=>p.classList.remove('prompt-current'));
     const el=document.getElementById('game-log');
-    // Blank separator line before new prompt so dialogue groups are visually distinct
     const sep=document.createElement('p');sep.className='log-spacer';sep.innerHTML='&nbsp;';
     el.insertAdjacentElement('afterbegin',sep);
     const p=document.createElement('p');p.className='prompt-current';p.textContent=text;
     el.insertAdjacentElement('afterbegin',p);
 }
-function log(text,style='pale'){document.querySelectorAll('#game-log .log-recent').forEach(p=>p.classList.remove('log-recent'));const el=document.getElementById('game-log'),p=document.createElement('p');p.classList.add('log-recent');if(style==='blood')p.classList.add('log-blood');p.style.color=style==='blood'?'var(--blood)':style==='dim'?'var(--dim)':'var(--pale)';p.textContent=text;el.insertAdjacentElement('afterbegin',p);}
+function log(text,style='pale'){const el=document.getElementById('game-log'),p=document.createElement('p');if(style==='blood')p.classList.add('log-blood');else if(style==='speech')p.classList.add('log-speech');p.textContent=text;el.insertAdjacentElement('afterbegin',p);enrichLog(el,p);}
 function logHTML(html){
-    document.querySelectorAll('#game-log .log-recent').forEach(p=>p.classList.remove('log-recent'));
     const el=document.getElementById('game-log'),p=document.createElement('p');
-    p.classList.add('log-recent');p.style.color='var(--pale)';
-    p.innerHTML=enrichLogHTML(html);
+    p.innerHTML=html;
     el.insertAdjacentElement('afterbegin',p);
+    enrichLog(el,p);
 }
 
 /**
@@ -1018,18 +1275,88 @@ function logHTML(html){
  * Item names are matched against GAME_DATA.items; damage types against DAMAGE_TYPES.
  */
 function enrichLogHTML(html){
-    // Wrap known item names with a tooltip
+    return html; // tooltips added via JS after insert — see wrapLogTips()
+}
+
+/* After inserting a log <p>, wire tooltip spans in it using the global tip system */
+function wrapLogTips(p){
+    // Item names
+    GAME_DATA.items.forEach(item=>{
+        p.querySelectorAll('.log-tip-item').forEach(el=>{
+            if(el.dataset.tipped) return;
+            el.dataset.tipped='1';
+            showTip(el, `<span style="color:#c9a227">✦ ${el.textContent}</span><br>+${item.val} <span style="color:#88ccff">${item.stat.toUpperCase()}</span>`);
+        });
+    });
+    // Damage type spans (colored via logHTML)
+    p.querySelectorAll('[data-dmgtype]').forEach(el=>{
+        if(el.dataset.tipped) return;
+        el.dataset.tipped='1';
+        const dt=DAMAGE_TYPES[el.dataset.dmgtype];
+        if(dt) showTip(el, `<span style="color:${dt.color}">${dt.label}</span> damage`);
+    });
+}
+
+function enrichLog(el, p) {
+    // Wrap item names in log text with hoverable spans
     GAME_DATA.items.forEach(item=>{
         const esc=item.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-        const re=new RegExp(`(${esc})`,'g');
-        html=html.replace(re,`<span class="log-item-tip">$1<span class="log-inline-tip">✦ ${item.name}<br>+${item.val} ${item.stat.toUpperCase()}</span></span>`);
+        const re=new RegExp('('+esc+')','g');
+        if(p.innerHTML.includes(item.name)){
+            p.innerHTML=p.innerHTML.replace(re,
+                `<span style="color:#c9a227;cursor:help;text-decoration:underline dotted rgba(201,162,39,.45);" data-itemname="${item.name.replace(/"/g,'&quot;')}">$1</span>`);
+        }
     });
-    return html;
+    // Wire tooltips on item name spans
+    p.querySelectorAll('[data-itemname]').forEach(span=>{
+        if(span.dataset.tipped) return; span.dataset.tipped='1';
+        const item=GAME_DATA.items.find(x=>x.name===span.dataset.itemname);
+        if(!item) return;
+        const lore=item.lore?`<br><span style="color:#bbbbbb;font-style:italic">${item.lore}</span>`:'';
+        showTip(span, `<span style="color:#c9a227">✦ ${item.name}</span><br>+${item.val} <span style="color:#88ccff">${item.stat.toUpperCase()}</span>${lore}`);
+    });
+    // Wire tooltips on monster names in log
+    GAME_DATA.monsters.forEach(mon=>{
+        p.querySelectorAll('[data-monname]').forEach(span=>{
+            if(span.dataset.tipped) return; span.dataset.tipped='1';
+            const lore=mon.lore?`<br><span style="color:#bbbbbb;font-style:italic">${mon.lore}</span>`:'';
+            showTip(span, `<span style="color:#ff7777">${mon.name}</span>${lore}<br><span style="color:#ff7733">ATK: ${mon.str}</span>`);
+        });
+    });
 }
-function setChoices(choices){const el=document.getElementById('ctrl-play');el.innerHTML='';choices.forEach(c=>{const btn=document.createElement('button');btn.className=`px-btn${c.isGated?' gated-btn':''}`;btn.textContent=c.label;if(c.disabled)btn.classList.add('ability-cooldown');btn.addEventListener('click',()=>{el.querySelectorAll('button').forEach(b=>b.disabled=true);c.action();});el.appendChild(btn);});}
+function setChoices(choices){
+    const el=document.getElementById('ctrl-play');
+    el.innerHTML='';
+    choices.forEach(c=>{
+        const btn=document.createElement('button');
+        let cls='px-btn';
+        if(c.isGated)   cls+=' gated-btn';
+        if(c.cooldown)  cls+=' btn-cooldown';    // ability on cooldown — reddish
+        if(c.isFlee)    cls+=' btn-flee';
+        btn.className=cls;
+        if(c.disabled)  btn.classList.add('ability-cooldown');
+        btn.textContent=c.label;
+        // Attach tooltip via global system
+        if(c.tooltip) showTip(btn, c.tooltip);
+        btn.addEventListener('click',()=>{
+            el.querySelectorAll('button').forEach(b=>b.disabled=true);
+            c.action();
+        });
+        el.appendChild(btn);
+    });
+}
 function clearChoices(){document.getElementById('ctrl-play').innerHTML='';}
 function renderStats(){detectPartyLeader();renderPortraitStrip();}
-function renderTreasury(){const bar=document.getElementById('treasury-bar');if(!bar)return;const v=treasury.gold+treasury.gems*20;bar.textContent=`⚔ Turn ${turn}/${MAX_TURNS}  ·  ${treasury.gold} gold  ·  ${treasury.gems} gems  ·  ${v} gold value`;}
+function renderTreasury(){
+    const bar=document.getElementById('treasury-bar');
+    if(!bar)return;
+    const total=treasury.gold+(treasury.gems||0)*100;
+    bar.innerHTML=
+        `<span class='tbar-turn'>⚔ Turn ${turn}/${MAX_TURNS}</span>`+
+        `<span class='tbar-gold'>🪙 ${treasury.gold} Gold</span>`+
+        `<span class='tbar-gem'>💎 ${treasury.gems||0} Gems</span>`+
+        `<span class='tbar-total'>🏆 ${total} Total Riches</span>`;
+}
 
 const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
