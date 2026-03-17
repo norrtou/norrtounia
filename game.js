@@ -663,20 +663,61 @@ function renderSetup(){
     const c=document.getElementById('party-slots');c.innerHTML='';
     party.forEach((h,i)=>{
         const d=document.createElement('div');d.className=`slot-card${h.locked?' locked':''}`;
-        // Ability tooltip for setup card: each ability with full description
-        const abilTip=h.abilities.map(a=>`<b>${a.name}</b> (CD:${a.cooldown}rnd)<br>${a.desc}`).join('<br>─<br>');
-        const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}: ${v>0?'+':''}${v}%`).join(', ')||'None';
+        const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0)
+            .map(([k,v])=>`<span style="color:#ff7733">${k}: ${v>0?'+':''}${v}%</span>`).join('<br>')||'None';
         d.innerHTML=`
             <span class="slot-name">${h.isLeader?'👑 ':''}${h.name}</span>
-            <span class="slot-sub">${h.race} · ${h.job}</span>
+            <span class="slot-sub" data-setup-racejob="${i}">
+                <span data-setup-race="${i}" style="cursor:help;border-bottom:1px dotted rgba(201,162,39,.4)">${h.race}</span>
+                ·
+                <span data-setup-job="${i}"  style="cursor:help;border-bottom:1px dotted rgba(201,162,39,.4)">${h.job}</span>
+            </span>
             <span class="slot-stats">HP:${h.hp} STR:${h.str} INT:${h.int} DEX:${h.dex}</span>
             <span class="slot-stats">CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span>
-            <span class="slot-sub ability-hint setup-ability-hint">
-                ⚡ ${h.abilities.map(a=>a.name).join(' · ')}
-                <div class="stat-tooltip setup-tooltip">${abilTip}<br>─<br><b>Resistances:</b> ${resLines}</div>
-            </span>
+            <span class="slot-sub ability-hint" style="cursor:help" data-setup-abil="${i}">⚡ ${h.abilities.map(a=>a.name).join(' · ')}</span>
             <button class="bind-btn" onclick="toggleLock(${i})">${h.locked?'🔒 BOUND':'🔓 BIND'}</button>`;
         c.appendChild(d);
+
+        // Wire tooltips via global JS system (immune to overflow:hidden)
+        const raceData=GAME_DATA.races.find(r=>r.name===h.race);
+        const clsData=GAME_DATA.classes.find(cl=>cl.name===h.job);
+        const genderName=h.gender===0?'Male':'Female';
+        const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
+        const initMod=Math.floor((h.dex+h.lck)/4);
+        const resHTML=Object.entries(h.resistances).filter(([,v])=>v!==0)
+            .map(([k,v])=>`<span style="color:#ff7733">${k}: ${v>0?'+':''}${v}%</span>`).join('  ')||'None';
+
+        // Race tooltip
+        const raceLoreText=raceData?.lore?`<br><br><em style="color:#aaaaaa;font-style:italic">${raceData.lore}</em>`:'';
+        const raceTip=
+            `<span style="color:#e8c45a;font-size:1.05em">${h.race}</span><br>`+
+            `<span style="color:#88ccff">HP:${h.hp}  STR:${h.str}  INT:${h.int}  DEX:${h.dex}</span><br>`+
+            `<span style="color:#88ccff">CHA:${h.cha}  STA:${h.sta}  LCK:${h.lck}</span>`+
+            (resHTML!=='None'?`<br><span style="color:#ff7733">Resistances: ${resHTML}</span>`:'')+
+            raceLoreText;
+        const raceEl=d.querySelector(`[data-setup-race="${i}"]`);
+        if(raceEl) showTip(raceEl, raceTip);
+
+        // Class tooltip
+        const abilLines=h.abilities.map(a=>
+            `<span style="color:#e879f9">${a.name}</span> (CD:${a.cooldown}): <span style="color:#bbbbbb">${a.desc}</span>`
+        ).join('<br>');
+        const clsLoreText=clsData?.lore?`<br><br><em style="color:#aaaaaa;font-style:italic">${clsData.lore}</em>`:'';
+        const genderLoreText2=(typeof GENDER_LORE!=='undefined')?GENDER_LORE[h.gender]:'';
+        const genderLoreEl=genderLoreText2?`<br><br><span style="color:#e8c45a">${h.gender===0?'Male':'Female'}</span><br><em style="color:#aaaaaa;font-style:italic">${genderLoreText2}</em>`:'';
+        const clsTip=
+            `<span style="color:#e8c45a;font-size:1.05em">${h.job}</span><br>`+
+            `Primary stat: <span style="color:#88ccff">${h.primaryStat?.toUpperCase()}</span>  `+
+            `Damage: <span style="color:#ff7733">${h.damageType}</span>`+
+            clsLoreText+
+            `<br><br><span style="color:#e879f9">Abilities:</span><br>${abilLines}`+
+            genderLoreEl;
+        const jobEl=d.querySelector(`[data-setup-job="${i}"]`);
+        if(jobEl) showTip(jobEl, clsTip);
+
+        // Ability hint tooltip (same as class but focused on abilities)
+        const abilEl=d.querySelector(`[data-setup-abil="${i}"]`);
+        if(abilEl) showTip(abilEl, `<span style="color:#e879f9">Class Abilities</span><br><br>${abilLines}`);
     });
     renderPortraitStrip();
 }
@@ -823,7 +864,24 @@ function renderPortraitStrip(){
             const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
             const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}: ${v>0?'+':''}${v}%`).join('<br>')||'None';
             const abilLines=h.abilities.map(a=>{const cd=h.abilityCooldowns[a.id]||0;return `${tc('skill',a.name)} ${cd>0?tc('warn','('+cd+' rnd)'):'<span style="color:#6abf45">✓</span>'}: ${a.desc}`;}).join('<br>');
-            const statHtml=`<b>${h.name}</b> Lv.${h.level}<br>${tc('stat','STR:'+h.str+' INT:'+h.int+' DEX:'+h.dex)}<br>${tc('stat','CHA:'+h.cha+' STA:'+h.sta+' LCK:'+h.lck)}<br>Lead:${h.leadership} · ${moralLabel}<br>INIT:+${initMod}<br>${tc('warn','Resist: '+resLines)}<br><br>${abilLines}`;
+            const raceData=GAME_DATA.races.find(r=>r.name===h.race);
+            const clsData=GAME_DATA.classes.find(c=>c.name===h.job);
+            const genderName=h.gender===0?'Male':'Female';
+            const genderLoreText=(typeof GENDER_LORE!=='undefined')?GENDER_LORE[h.gender]:'';
+            const raceLore=raceData?.lore?`<br><em style="color:#aaaaaa;font-style:italic">${raceData.lore}</em>`:'';
+            const clsLore=clsData?.lore?`<br><em style="color:#aaaaaa;font-style:italic">${clsData.lore}</em>`:'';
+            const genderLore=genderLoreText?`<br><em style="color:#aaaaaa;font-style:italic">${genderLoreText}</em>`:'';
+            const statHtml=
+                `<b style="color:#ffffff">${h.name}</b>  <span style="color:#88ccff">Lv.${h.level}</span><br>`+
+                `${tc('stat','STR:'+h.str+'  INT:'+h.int+'  DEX:'+h.dex)}<br>`+
+                `${tc('stat','CHA:'+h.cha+'  STA:'+h.sta+'  LCK:'+h.lck)}<br>`+
+                `Leadership: ${h.leadership}  ·  ${moralLabel}<br>`+
+                `Initiative bonus: +${initMod}<br>`+
+                (resLines!=='None'?`${tc('warn','Resistances: '+resLines)}<br>`:'')+ 
+                `<br>${abilLines}`+
+                `<br><br><span style="color:#e8c45a">${h.race}</span>${raceLore}`+
+                `<br><br><span style="color:#e8c45a">${h.job}</span>${clsLore}`+
+                `<br><br><span style="color:#e8c45a">${genderName}</span>${genderLore}`;
             const hpHtml=`${tc('hp','HP: '+h.hp+'/'+h.maxHp)}<br>XP: ${h.xp}/${h.xpNext}`;
             const spriteEl=card.querySelector('.portrait-sprite-wrap');
             const nameEl=card.querySelector('.pi-name');
@@ -1298,30 +1356,40 @@ function wrapLogTips(p){
 }
 
 function enrichLog(el, p) {
-    // Wrap item names in log text with hoverable spans
+    // Work on innerHTML so we can wrap text nodes
+    // Step 1: wrap item names
     GAME_DATA.items.forEach(item=>{
+        if(!p.innerHTML.includes(item.name)) return;
         const esc=item.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-        const re=new RegExp('('+esc+')','g');
-        if(p.innerHTML.includes(item.name)){
-            p.innerHTML=p.innerHTML.replace(re,
-                `<span style="color:#c9a227;cursor:help;text-decoration:underline dotted rgba(201,162,39,.45);" data-itemname="${item.name.replace(/"/g,'&quot;')}">$1</span>`);
-        }
+        p.innerHTML=p.innerHTML.replace(
+            new RegExp('(?<![\w>])(' + esc + ')(?![\w<])', 'g'),
+            `<span style="color:#c9a227;cursor:help;border-bottom:1px dotted rgba(201,162,39,.5);" data-itemname="${item.name.replace(/"/g,'&quot;')}">$1</span>`
+        );
     });
-    // Wire tooltips on item name spans
+    // Step 2: wrap monster names
+    GAME_DATA.monsters.forEach(mon=>{
+        if(!p.innerHTML.includes(mon.name)) return;
+        const esc=mon.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        p.innerHTML=p.innerHTML.replace(
+            new RegExp('(?<![\w>])(' + esc + ')(?![\w<])', 'g'),
+            `<span style="color:#ff9999;cursor:help;border-bottom:1px dotted rgba(255,100,100,.5);" data-monname="${mon.name.replace(/"/g,'&quot;')}">$1</span>`
+        );
+    });
+    // Step 3: wire showTip on all wrapped spans
     p.querySelectorAll('[data-itemname]').forEach(span=>{
         if(span.dataset.tipped) return; span.dataset.tipped='1';
         const item=GAME_DATA.items.find(x=>x.name===span.dataset.itemname);
         if(!item) return;
-        const lore=item.lore?`<br><span style="color:#bbbbbb;font-style:italic">${item.lore}</span>`:'';
+        const lore=item.lore?`<br><br><em style="color:#bbbbbb">${item.lore}</em>`:'';
         showTip(span, `<span style="color:#c9a227">✦ ${item.name}</span><br>+${item.val} <span style="color:#88ccff">${item.stat.toUpperCase()}</span>${lore}`);
     });
-    // Wire tooltips on monster names in log
-    GAME_DATA.monsters.forEach(mon=>{
-        p.querySelectorAll('[data-monname]').forEach(span=>{
-            if(span.dataset.tipped) return; span.dataset.tipped='1';
-            const lore=mon.lore?`<br><span style="color:#bbbbbb;font-style:italic">${mon.lore}</span>`:'';
-            showTip(span, `<span style="color:#ff7777">${mon.name}</span>${lore}<br><span style="color:#ff7733">ATK: ${mon.str}</span>`);
-        });
+    p.querySelectorAll('[data-monname]').forEach(span=>{
+        if(span.dataset.tipped) return; span.dataset.tipped='1';
+        const mon=GAME_DATA.monsters.find(x=>x.name===span.dataset.monname);
+        if(!mon) return;
+        const lore=mon.lore?`<br><br><em style="color:#bbbbbb">${mon.lore}</em>`:'';
+        const hpInfo=mon.hp?`<br>HP: <span style="color:#88ccff">${mon.hp}</span>  ATK: <span style="color:#ff7733">${mon.str}</span>`:'';
+        showTip(span, `<span style="color:#ff9999">${mon.name}</span>${hpInfo}${lore}`);
     });
 }
 function setChoices(choices){
