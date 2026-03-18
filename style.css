@@ -27,19 +27,25 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
-html,body{
+html{
     height:100%;
     background:#000;
+    /* Allow the page to scroll on small screens */
+    overflow-y:auto;
+    overflow-x:hidden;
 }
 body{
+    min-height:100%;
+    background:#000;
     color:var(--white);
     font-family:var(--ff);
     display:flex;
     flex-direction:column;
     align-items:center;
+    /* Centre vertically when there is room, scroll when there is not */
     justify-content:center;
-    overflow:hidden;
-    padding:4px 8px 3px;
+    overflow:visible;
+    padding:6px 8px 10px;
     gap:3px;
 }
 
@@ -49,8 +55,12 @@ body{
     flex-direction:column;
     align-items:center;
     gap:3px;
+    /* Width scales with viewport height on large screens, 
+       but uses full width on small/narrow screens */
     width:min(98vw, calc((100vh - 100px) * 1376 / 768));
     overflow:visible;
+    /* Prevent the wrapper itself from being taller than its content */
+    box-sizing:border-box;
 }
 
 /* ══════════════════════════════════════════════════
