@@ -230,7 +230,8 @@ function playSfxForDmgType(dmgType){
 /* ═══════════════════════════════════════════════════════════════
    3. MUSIC — 5 synthesised tracks
    ═══════════════════════════════════════════════════════════════ */
-let bgStarted=false,bgMaster=null;
+let bgStarted=false,bgMaster=null,musicMuted=false;
+function toggleMusic(){musicMuted=!musicMuted;if(bgMaster)bgMaster.gain.value=musicMuted?0:0.0196;renderTreasury();}
 const N={A2:110,B2:123.5,C3:130.8,D3:146.8,E3:164.8,F3:174.6,Fs3:185,G3:196,A3:220,Bb3:233.1,B3:246.9,C4:261.6,Cs4:277.2,D4:293.7,E4:329.6,F4:349.2,Fs4:370,G4:392,A4:440,B4:493.9,C5:523.3,D5:587.3,E5:659.3,G5:784};
 const MUSIC_TRACKS=[
 /*
@@ -737,9 +738,7 @@ function renderSetup(){
         if(raceEl) showTip(raceEl, raceTip);
 
         // Class tooltip
-        const abilLines=h.abilities.map(a=>
-            `<span style="color:#e879f9">${a.name}</span> (CD:${a.cooldown}): <span style="color:#bbbbbb">${a.desc}</span>`
-        ).join('<br>');
+        const abilLines=[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `<span style="color:#e879f9">${a.name}</span> <span style="color:#aaaaaa">CD:${a.cooldown} · INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span></span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
         const clsLoreText=clsData?.lore?`<br><br><em style="color:#aaaaaa;font-style:italic">${clsData.lore}</em>`:'';
         const genderLoreText2=(typeof GENDER_LORE!=='undefined')?GENDER_LORE[h.gender]:'';
         const genderLoreEl=genderLoreText2?`<br><br><span style="color:#e8c45a">${h.gender===0?'Male':'Female'}</span><br><em style="color:#aaaaaa;font-style:italic">${genderLoreText2}</em>`:'';
@@ -895,7 +894,7 @@ function renderPortraitStrip(){
             const moralDmgBonus=dtAlign==='light'&&h.morality>0?Math.floor(h.morality/20):dtAlign==='dark'&&h.morality<0?Math.floor(-h.morality/20):0;
             const scenMod=clamp(Math.floor(h.morality/10),-5,5);
             const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}:${v>0?'+':''}${v}%`).join(' ')||'None';
-            const abilLines=h.abilities.map(a=>{const cd=h.abilityCooldowns[a.id]||0;return `<span style="color:#e879f9">${a.name}</span>${cd>0?' ('+cd+'rnd)':' ✓'}: ${a.desc}`;}).join('<br>');
+            const abilLines=[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns?.[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `<span style="color:#e879f9">${a.name}</span> <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span>${cd>0?' · ⏳'+cd+'rnd':' · ✓'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
             const cohMod=partyAlignmentMod();
             const statTip=`<b>${h.name}</b> Lv.${h.level}<br><span style="color:#88ccff">STR:${h.str} INT:${h.int} DEX:${h.dex}<br>CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span><br>INIT:+${initMod} · Lead:${h.leadership} (Aura +${aura})<br>⚖ ${moralLabel} (${h.morality})${moralDmgBonus>0?' +'+moralDmgBonus+' '+h.damageType:''}${scenMod!==0?' · scenario '+(scenMod>0?'-':'+')+Math.abs(scenMod)+' dmg':''}<br>Cohesion: ${cohMod>0?'+'+cohMod+' ✦ Aligned':cohMod<0?cohMod+' ⚠ Divided':'0 Neutral'}<br><span style="color:#ff7733">Resist: ${resLines}</span><br>${abilLines}`;
             const hpTip=`<span style="color:#6abf45">HP: ${h.hp}/${h.maxHp}</span>  XP: ${h.xp}/${h.xpNext}`;
@@ -930,7 +929,7 @@ function renderPortraitStrip(){
             const cohLabel=cohMod2>0?`<span style="color:#6abf45">✦ Aligned (+${cohMod2} initiative) — Light and Dark are in harmony.</span>`:cohMod2<0?`<span style="color:#cc3333">⚠ Divided (${cohMod2} initiative) — ${lightCount} light vs ${darkCount} dark hero${lightCount+darkCount!==1?'es':''} in conflict.</span>`:`<span style="color:#aaaaaa">Neutral — no alignment synergy or conflict.</span>`;
             const cohDesc=cohMod2>0?`All heroes roll initiative with +${cohMod2}. Shared conviction sharpens the fellowship.`:cohMod2<0?`All heroes roll initiative with ${cohMod2}. Opposing beliefs fracture the fellowship's resolve.`:`Neutral heroes do not impose cohesion effects on others.`;
             const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}: ${v>0?'+':''}${v}%`).join('<br>')||'None';
-            const abilLines=h.abilities.map(a=>{const cd=h.abilityCooldowns[a.id]||0;return `${tc('skill',a.name)} ${cd>0?tc('warn','('+cd+' rnd)'):'<span style="color:#6abf45">✓</span>'}: ${a.desc}`;}).join('<br>');
+            const abilLines=[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `${tc('skill',a.name)} <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span> · ${cd>0?tc('warn','⏳'+cd+'rnd'):'<span style="color:#6abf45">✓ ready</span>'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
             const raceData=GAME_DATA.races.find(r=>r.name===h.race);
             const clsData=GAME_DATA.classes.find(c=>c.name===h.job);
             const genderName=h.gender===0?'Male':'Female';
@@ -952,7 +951,7 @@ function renderPortraitStrip(){
                 `<em style="color:#aaaaaa">${scenModLine}</em><br>`+
                 `<br>${cohLabel}<br>`+
                 `<em style="color:#aaaaaa">${cohDesc}</em>`+
-                `<br><br>${abilLines}`+
+                `<br><br><span style="color:#e879f9">— Abilities (weak → strong) —</span><br>${abilLines}`+
                 `<br><br><span style="color:#e8c45a">${h.race}</span>${raceLore}`+
                 `<br><br><span style="color:#e8c45a">${h.job}</span>${clsLore}`+
                 `<br><span style="color:#c8c0b0">⚔ Basic attacks: ${h.attackNames.join(' · ')}</span><br>`+
@@ -1544,7 +1543,9 @@ function renderTreasury(){
         `<span class='tbar-turn'>⚔ Turn ${turn}/${MAX_TURNS}</span>`+
         `<span class='tbar-gold'>🪙 ${treasury.gold} Gold</span>`+
         `<span class='tbar-gem'>💎 ${treasury.gems||0} Gems</span>`+
-        `<span class='tbar-total'>🏆 ${total} Total Riches</span>`;
+        `<span class='tbar-total'>🏆 ${total} Total Riches</span>`+
+        `<label class='tbar-music' style="cursor:pointer;opacity:0.55;font-size:0.82em;display:inline-flex;align-items:center;gap:3px;user-select:none;" title="Toggle music">`+
+        `<input type='checkbox' ${musicMuted?'':'checked'} onchange='toggleMusic()' style="cursor:pointer;accent-color:#c9a227;width:11px;height:11px;"> ♪</label>`;
 }
 
 const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
