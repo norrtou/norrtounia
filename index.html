@@ -26,7 +26,7 @@
         <div id="hero-panel" role="list" aria-label="Party members"></div>
         <header id="site-header">
             <h1 id="game-title">NORRTOUNIA</h1>
-            <p id="game-sub">The Dark Forest <span id="version">v1.1</span></p>
+            <p id="game-sub">The Dark Forest <span id="version">v1.0</span></p>
         </header>
         <div id="monster-panel" role="complementary" aria-label="Enemy"></div>
     </div>
@@ -52,8 +52,10 @@
                     <div id="team-name-wrap">
                         <label for="team-name-input" class="team-label">Fellowship Name:</label>
                         <input type="text" id="team-name-input" class="team-input"
-                               maxlength="24" placeholder="The Iron Fellowship"
+                               maxlength="24" placeholder="Name your team"
                                autocomplete="off" spellcheck="false">
+                        <button id="btn-save-name" class="px-btn">Save</button>
+                        <button id="btn-enter" class="px-btn gold-btn">▶ Enter the Forest</button>
                     </div>
                 </section>
 
@@ -78,7 +80,7 @@
 
     <div id="controls">
         <div id="ctrl-intro">
-            <button id="btn-enter" class="px-btn gold-btn">▶ Enter the Forest</button>
+            <!-- btn-enter is now inline with the team name field -->
         </div>
         <div id="ctrl-setup" class="hidden">
             <button id="btn-roll"  class="px-btn">⚄ Roll Fate [R]</button>

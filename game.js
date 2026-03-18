@@ -609,6 +609,19 @@ const ABILITY_EFFECTS={
 document.addEventListener('DOMContentLoaded',()=>{
     rollParty();
     document.getElementById('btn-enter').addEventListener('click',enterWood);
+    // Save button: saves name and shows a brief visual confirmation
+    const saveBtn=document.getElementById('btn-save-name');
+    if(saveBtn){
+        saveBtn.addEventListener('click',()=>{
+            const inp=document.getElementById('team-name-input');
+            const name=(inp?.value.trim())||'';
+            if(name){
+                saveBtn.textContent='✓ Saved';
+                saveBtn.style.color='#6abf45';
+                setTimeout(()=>{saveBtn.textContent='Save';saveBtn.style.color='';},1200);
+            }
+        });
+    }
     document.getElementById('btn-roll').addEventListener('click',()=>{SFX.roll();rollParty();});
     document.getElementById('btn-start').addEventListener('click',startGame);
     window.addEventListener('keydown',e=>{
