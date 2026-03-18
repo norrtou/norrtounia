@@ -706,16 +706,16 @@ function renderSetup(){
         const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0)
             .map(([k,v])=>`<span style="color:#ff7733">${k}: ${v>0?'+':''}${v}%</span>`).join('<br>')||'None';
         d.innerHTML=`
-            <span class="slot-name">${h.isLeader?'👑 ':''}${alignIcon(h.morality)} ${h.name}</span>
+            <span class="slot-name" data-setup-name="${i}" style="cursor:help">${h.isLeader?'👑 ':''}${alignIcon(h.morality)} ${h.name}</span>
             <span class="slot-sub" data-setup-racejob="${i}">
                 <span data-setup-race="${i}" style="cursor:help;border-bottom:1px dotted rgba(201,162,39,.4)">${h.race}</span>
                 ·
                 <span data-setup-job="${i}"  style="cursor:help;border-bottom:1px dotted rgba(201,162,39,.4)">${h.job}</span>
             </span>
-            <span class="slot-stats">HP:${h.hp} STR:${h.str} INT:${h.int} DEX:${h.dex}</span>
-            <span class="slot-stats">CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span>
-            <span class="slot-sub" style="color:#c8c0b0">⚔ ${h.attackNames.join(' · ')}</span>
-            <span class="slot-sub ability-hint" style="cursor:help" data-setup-abil="${i}">⚡ ${h.abilities.map(a=>a.name).join(' · ')}</span>
+            <span class="slot-stats" data-setup-stats1="${i}" style="cursor:help">HP:${h.hp} STR:${h.str} INT:${h.int} DEX:${h.dex}</span>
+            <span class="slot-stats" data-setup-stats2="${i}" style="cursor:help">CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span>
+            <span class="slot-sub" data-setup-atk="${i}" style="color:#c8c0b0;cursor:help">⚔ ${h.attackNames.join(' · ')}</span>
+            <span class="slot-sub ability-hint" style="cursor:help" data-setup-abil="${i}">⚡ ${h.attackNames.join(' · ')} · ${h.abilities.map(a=>a.name).join(' · ')}</span>
             <button class="bind-btn" onclick="toggleLock(${i})">${h.locked?'Release':'Keep Hero'}</button>`;
         c.appendChild(d);
 
@@ -740,7 +740,11 @@ function renderSetup(){
         if(raceEl) showTip(raceEl, raceTip);
 
         // Class tooltip
+        const atkInfoLine=`<span style="color:#c8c0b0">⚔ Basic Attacks</span> <span style="color:#aaaaaa">INIT cost: 1 · Recovery +2 on hit · net <span style="color:#6abf45">+1</span></span><br>`+
+            `<span style="color:#bbbbbb;padding-left:8px">${h.attackNames.join(' · ')}</span><br>`+
+            `<span style="color:#aaaaaa;padding-left:8px">Damage based on <span style="color:#88ccff">${h.primaryStat?.toUpperCase()}</span> · type: <span style="color:#ff7733">${h.damageType}</span> · one chosen at random</span>`;
         const abilLines=[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `<span style="color:#e879f9">${a.name}</span> <span style="color:#aaaaaa">CD:${a.cooldown} · INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span></span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
+        const allAbilLines=atkInfoLine+'<br>'+abilLines;
         const clsLoreText=clsData?.lore?`<br><br><em style="color:#aaaaaa;font-style:italic">${clsData.lore}</em>`:'';
         const genderLoreText2=(typeof GENDER_LORE!=='undefined')?GENDER_LORE[h.gender]:'';
         const genderLoreEl=genderLoreText2?`<br><br><span style="color:#e8c45a">${h.gender===0?'Male':'Female'}</span><br><em style="color:#aaaaaa;font-style:italic">${genderLoreText2}</em>`:'';
@@ -749,14 +753,45 @@ function renderSetup(){
             `Primary stat: <span style="color:#88ccff">${h.primaryStat?.toUpperCase()}</span>  `+
             `Damage: <span style="color:#ff7733">${h.damageType}</span>`+
             clsLoreText+
-            `<br><br><span style="color:#e879f9">Abilities:</span><br>${abilLines}`+
+            `<br><br><span style="color:#e879f9">Abilities:</span><br>${allAbilLines}`+
             genderLoreEl;
         const jobEl=d.querySelector(`[data-setup-job="${i}"]`);
         if(jobEl) showTip(jobEl, clsTip);
 
-        // Ability hint tooltip (same as class but focused on abilities)
+        // Ability hint tooltip — all abilities including basic attacks
         const abilEl=d.querySelector(`[data-setup-abil="${i}"]`);
-        if(abilEl) showTip(abilEl, `<span style="color:#e879f9">Class Abilities</span><br><br>${abilLines}`);
+        if(abilEl) showTip(abilEl, `<span style="color:#e879f9">All Abilities</span><br><br>${allAbilLines}`);
+
+        // Hero name tooltip — leadership info
+        const leaderTip=h.isLeader
+            ?`<span style="color:#e8c45a">👑 Party Leader</span><br>Highest <span style="color:#88ccff">DEX+LCK</span> in the fellowship.<br>+2 initiative in battle · may attempt to flee.<br>Leadership ${h.leadership}: grants +${Math.ceil(h.leadership/5)} max HP to allies.`
+            :`<span style="color:#aaaaaa">${h.name}</span><br>Not the party leader.<br><span style="color:#aaaaaa">Leader is determined by highest DEX+LCK score.</span>`;
+        const nameEl=d.querySelector(`[data-setup-name="${i}"]`);
+        if(nameEl) showTip(nameEl, leaderTip);
+
+        // Stats tooltips
+        const stats1Tip=
+            `<span style="color:#6abf45">HP ${h.hp}</span> — total hit points before falling in combat<br>`+
+            `<span style="color:#88ccff">STR ${h.str}</span> — melee/physical damage (if primary stat)<br>`+
+            `<span style="color:#88ccff">INT ${h.int}</span> — spell/arcane damage (if primary stat)<br>`+
+            `<span style="color:#88ccff">DEX ${h.dex}</span> — affects initiative order and crit chance`;
+        const stats2Tip=
+            `<span style="color:#88ccff">CHA ${h.cha}</span> — party cohesion and scenario social checks<br>`+
+            `<span style="color:#88ccff">STA ${h.sta}</span> — stamina; affects resting and endurance<br>`+
+            `<span style="color:#88ccff">LCK ${h.lck}</span> — crit chance, item finds, and initiative<br>`+
+            `<br><span style="color:#aaaaaa">Initiative bonus: +${initMod} (from DEX+LCK)</span>`;
+        const stats1El=d.querySelector(`[data-setup-stats1="${i}"]`);
+        const stats2El=d.querySelector(`[data-setup-stats2="${i}"]`);
+        if(stats1El) showTip(stats1El, stats1Tip);
+        if(stats2El) showTip(stats2El, stats2Tip);
+
+        // Basic attack tooltip
+        const atkEl=d.querySelector(`[data-setup-atk="${i}"]`);
+        if(atkEl) showTip(atkEl, `<span style="color:#c8c0b0">⚔ Basic Attacks</span><br><br>`+
+            `<span style="color:#bbbbbb">${h.attackNames.join('<br>')}</span><br><br>`+
+            `Damage based on <span style="color:#88ccff">${h.primaryStat?.toUpperCase()}</span> · type: <span style="color:#ff7733">${h.damageType}</span><br>`+
+            `INIT cost: <span style="color:#6abf45">1</span> · Recovery on hit: <span style="color:#6abf45">+2</span> · Net: <span style="color:#6abf45">+1/round</span><br>`+
+            `One attack name is chosen at random each turn.`);
     });
     renderPortraitStrip();
     // Action buttons below the hero cards, appended to the screen section (not the flex row)
@@ -885,6 +920,13 @@ function renderPortraitStrip(){
     if(hp){
         const order=party.map((h,i)=>({h,i}));
         if(battle.active) order.sort((a,b)=>(b.h.lastInitiative||0)-(a.h.lastInitiative||0));
+        // During battle, crown goes to the hero with the highest current initiative (next to act)
+        let crownHeroIdx=null;
+        if(battle.active){
+            const heroEntries=battle.order.filter(e=>e.type==='hero'&&e.entity.hp>0);
+            const topEntry=heroEntries.reduce((b,e)=>!b||e.initiative>b.initiative?e:b,null);
+            if(topEntry)crownHeroIdx=party.indexOf(topEntry.entity);
+        }
         hp.innerHTML=order.map(({h,i})=>{
             const dead=h.hp<=0;
             const hpPct=h.maxHp>0?h.hp/h.maxHp*100:0;
@@ -896,7 +938,8 @@ function renderPortraitStrip(){
             const moralDmgBonus=dtAlign==='light'&&h.morality>0?Math.floor(h.morality/20):dtAlign==='dark'&&h.morality<0?Math.floor(-h.morality/20):0;
             const scenMod=clamp(Math.floor(h.morality/10),-5,5);
             const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}:${v>0?'+':''}${v}%`).join(' ')||'None';
-            const abilLines=[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns?.[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `<span style="color:#e879f9">${a.name}</span> <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span>${cd>0?' · ⏳'+cd+'rnd':' · ✓'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
+            const atkLine=`<span style="color:#c8c0b0">⚔ Basic: ${h.attackNames.join(' · ')}</span> <span style="color:#aaaaaa">(INIT cost:1 · net +1)</span>`;
+            const abilLines=atkLine+'<br>'+[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns?.[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `<span style="color:#e879f9">${a.name}</span> <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span>${cd>0?' · ⏳'+cd+'rnd':' · ✓'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
             const cohMod=partyAlignmentMod();
             const statTip=`<b>${h.name}</b> Lv.${h.level}<br><span style="color:#88ccff">STR:${h.str} INT:${h.int} DEX:${h.dex}<br>CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span><br>INIT:+${initMod} · Lead:${h.leadership} (Aura +${aura})<br>⚖ ${moralLabel} (${h.morality})${moralDmgBonus>0?' +'+moralDmgBonus+' '+h.damageType:''}${scenMod!==0?' · scenario '+(scenMod>0?'-':'+')+Math.abs(scenMod)+' dmg':''}<br>Cohesion: ${cohMod>0?'+'+cohMod+' ✦ Aligned':cohMod<0?cohMod+' ⚠ Divided':'0 Neutral'}<br><span style="color:#ff7733">Resist: ${resLines}</span><br>${abilLines}`;
             const hpTip=`<span style="color:#6abf45">HP: ${h.hp}/${h.maxHp}</span>  XP: ${h.xp}/${h.xpNext}`;
@@ -905,7 +948,7 @@ function renderPortraitStrip(){
                 id:`portrait-card-${i}`,
                 name:h.name,
                 sublabel:`${h.gender===0?'Male':'Female'} ${h.race}<br>Level ${h.level}<br>${alignIcon(h.morality)} ${h.job}`,
-                hpPct,hpCol,dead,isLeader:h.isLeader,isMonster:false,
+                hpPct,hpCol,dead,isLeader:battle.active?i===crownHeroIdx:h.isLeader,isMonster:false,
                 items:h.items,statusIcons:battle.active?heroStatusIcons(i):[],
                 statTip,hpTip,
             });
@@ -927,7 +970,8 @@ function renderPortraitStrip(){
             const cohMod2=partyAlignmentMod();
             const cohLine=cohMod2>0?`<span style="color:#6abf45">✦ Party aligned · +${cohMod2} initiative</span>`:cohMod2<0?`<span style="color:#cc3333">⚠ Party divided · ${cohMod2} initiative</span>`:`<span style="color:#aaaaaa">Party cohesion: neutral</span>`;
             const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}: ${v>0?'+':''}${v}%`).join('<br>')||'None';
-            const abilLines=[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `${tc('skill',a.name)} <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span> · ${cd>0?tc('warn','⏳'+cd+'rnd'):'<span style="color:#6abf45">✓ ready</span>'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
+            const atkLine2=`<span style="color:#c8c0b0">⚔ Basic: ${h.attackNames.join(' · ')}</span> <span style="color:#aaaaaa">(INIT cost:1 · net +1)</span>`;
+            const abilLines=atkLine2+'<br>'+[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `${tc('skill',a.name)} <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span> · ${cd>0?tc('warn','⏳'+cd+'rnd'):'<span style="color:#6abf45">✓ ready</span>'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
             const raceData=GAME_DATA.races.find(r=>r.name===h.race);
             const clsData=GAME_DATA.classes.find(c=>c.name===h.job);
             const genderName=h.gender===0?'Male':'Female';
@@ -949,8 +993,6 @@ function renderPortraitStrip(){
                 `<br><span style="color:#e879f9">Abilities</span><br>${abilLines}`+
                 `<br><br><span style="color:#e8c45a">${h.race}</span>${raceLore}`+
                 `<br><br><span style="color:#e8c45a">${h.job}</span>${clsLore}`+
-                `<br><span style="color:#c8c0b0">⚔ Basic attacks: ${h.attackNames.join(' · ')}</span><br>`+
-                `<em style="color:#aaaaaa">Initiative cost: 1 (fast). One is chosen at random each attack.</em>`+
                 `<br><br><span style="color:#e8c45a">${genderName}</span>${genderLore}`;
             const hpHtml=`${tc('hp','HP: '+h.hp+'/'+h.maxHp)}<br>XP: ${h.xp}/${h.xpNext}`;
             const spriteEl=card.querySelector('.portrait-sprite-wrap');
