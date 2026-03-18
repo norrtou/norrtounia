@@ -904,7 +904,7 @@ function renderPortraitStrip(){
             return buildCard(spr,{
                 id:`portrait-card-${i}`,
                 name:h.name,
-                sublabel:`${alignIcon(h.morality)} ${h.job} · Lv.${h.level}`,
+                sublabel:`${h.gender===0?'Male':'Female'} ${h.race}<br>Level ${h.level}<br>${alignIcon(h.morality)} ${h.job}`,
                 hpPct,hpCol,dead,isLeader:h.isLeader,isMonster:false,
                 items:h.items,statusIcons:battle.active?heroStatusIcons(i):[],
                 statTip,hpTip,
