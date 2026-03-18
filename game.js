@@ -610,6 +610,8 @@ const ABILITY_EFFECTS={
 document.addEventListener('DOMContentLoaded',()=>{
     rollParty();
     document.getElementById('btn-enter').addEventListener('click',enterWood);
+    const scoresBtn=document.getElementById('btn-scores');
+    if(scoresBtn)showTip(scoresBtn,'See Heroes of Old');
     // Save button: saves name and shows a brief visual confirmation
     const saveBtn=document.getElementById('btn-save-name');
     if(saveBtn){
@@ -915,19 +917,15 @@ function renderPortraitStrip(){
             const dead=h.hp<=0;
             const initMod=Math.floor((h.dex+h.lck)/4);
             const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
-            const moralDesc=h.morality>30?'Upholds honour above all else. Holds the line when others would not.':h.morality>10?'Virtuous by habit, if not always by choice.':h.morality>-10?'Neither driven by virtue nor corruption. Reliable enough.':h.morality>-30?'Conscience worn thin. Useful in dark places.':'Honour is a memory. Power is the only language left.';
             const moralCol=h.morality>30?'#e8c45a':h.morality>10?'#6abf45':h.morality>-10?'#aaaaaa':h.morality>-30?'#c8802a':'#cc3333';
             const aura2=Math.ceil(h.leadership/5);
             const dtAlign2=DAMAGE_TYPES[h.damageType]?.alignment||'neutral';
             const moralDmgBonus2=dtAlign2==='light'&&h.morality>0?Math.floor(h.morality/20):dtAlign2==='dark'&&h.morality<0?Math.floor(-h.morality/20):0;
             const scenMod2=clamp(Math.floor(h.morality/10),-5,5);
-            const moralAlignLine=dtAlign2==='light'?`<span style="color:#ffd700">Light-aligned damage (holy, nature).</span> Positive morality grants +${moralDmgBonus2} bonus damage per hit.`:dtAlign2==='dark'?`<span style="color:#b47afe">Dark-aligned damage (shadow, necrotic, void, blood, poison, fire).</span> Negative morality grants +${moralDmgBonus2} bonus damage per hit.`:`<span style="color:#aaaaaa">Neutral damage type — morality grants no damage bonus.</span><br>Light types (holy, nature) favour the righteous. Dark types (shadow, necrotic, void, blood, poison, fire) favour the corrupt.`;
-            const scenModLine=scenMod2>0?`Righteous bearing softens misfortune: −${scenMod2} to scenario damage.`:scenMod2<0?`Corruption draws darker fate: +${-scenMod2} to scenario damage.`:`Morality too close to neutral to affect the wilds.`;
+            const moralAlignLine=dtAlign2==='light'&&h.morality>0?`<span style="color:#ffd700">Light damage · +${moralDmgBonus2} bonus per hit</span>`:dtAlign2==='dark'&&h.morality<0?`<span style="color:#b47afe">Dark damage · +${moralDmgBonus2} bonus per hit</span>`:dtAlign2==='light'?`<span style="color:#aaaaaa">Light damage · morality too low for bonus</span>`:dtAlign2==='dark'?`<span style="color:#aaaaaa">Dark damage · morality too righteous for bonus</span>`:`<span style="color:#aaaaaa">Neutral damage · no morality bonus</span>`;
+            const scenModLine=scenMod2>0?`Fate: −${scenMod2} incoming scenario damage`:scenMod2<0?`Fate: +${-scenMod2} incoming scenario damage`:'';
             const cohMod2=partyAlignmentMod();
-            const lightCount=party.filter(x=>x&&x.hp>0&&x.morality>10).length;
-            const darkCount=party.filter(x=>x&&x.hp>0&&x.morality<-10).length;
-            const cohLabel=cohMod2>0?`<span style="color:#6abf45">✦ Aligned (+${cohMod2} initiative) — Light and Dark are in harmony.</span>`:cohMod2<0?`<span style="color:#cc3333">⚠ Divided (${cohMod2} initiative) — ${lightCount} light vs ${darkCount} dark hero${lightCount+darkCount!==1?'es':''} in conflict.</span>`:`<span style="color:#aaaaaa">Neutral — no alignment synergy or conflict.</span>`;
-            const cohDesc=cohMod2>0?`All heroes roll initiative with +${cohMod2}. Shared conviction sharpens the fellowship.`:cohMod2<0?`All heroes roll initiative with ${cohMod2}. Opposing beliefs fracture the fellowship's resolve.`:`Neutral heroes do not impose cohesion effects on others.`;
+            const cohLine=cohMod2>0?`<span style="color:#6abf45">✦ Party aligned · +${cohMod2} initiative</span>`:cohMod2<0?`<span style="color:#cc3333">⚠ Party divided · ${cohMod2} initiative</span>`:`<span style="color:#aaaaaa">Party cohesion: neutral</span>`;
             const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0).map(([k,v])=>`${k}: ${v>0?'+':''}${v}%`).join('<br>')||'None';
             const abilLines=[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `${tc('skill',a.name)} <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span> · ${cd>0?tc('warn','⏳'+cd+'rnd'):'<span style="color:#6abf45">✓ ready</span>'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
             const raceData=GAME_DATA.races.find(r=>r.name===h.race);
@@ -946,12 +944,9 @@ function renderPortraitStrip(){
                 `<br><span style="color:#e8c45a">✦ Inspiring Aura  (Leadership ${h.leadership})</span><br>`+
                 `Grants +${aura2} max HP to allies · +${aura2} XP per combat victory.<br>`+
                 `<br><span style="font-size:1.2em">${alignIcon(h.morality)}</span> <span style="color:${moralCol};font-weight:bold">⚖ ${moralLabel}  (${h.morality})</span><br>`+
-                `<em style="color:#aaaaaa">${moralDesc}</em><br>`+
-                `${moralAlignLine}<br>`+
-                `<em style="color:#aaaaaa">${scenModLine}</em><br>`+
-                `<br>${cohLabel}<br>`+
-                `<em style="color:#aaaaaa">${cohDesc}</em>`+
-                `<br><br><span style="color:#e879f9">— Abilities (weak → strong) —</span><br>${abilLines}`+
+                `${moralAlignLine}`+(scenModLine?`  <span style="color:#aaaaaa">· ${scenModLine}</span>`:'')+`<br>`+
+                `${cohLine}<br>`+
+                `<br><span style="color:#e879f9">Abilities</span><br>${abilLines}`+
                 `<br><br><span style="color:#e8c45a">${h.race}</span>${raceLore}`+
                 `<br><br><span style="color:#e8c45a">${h.job}</span>${clsLore}`+
                 `<br><span style="color:#c8c0b0">⚔ Basic attacks: ${h.attackNames.join(' · ')}</span><br>`+
@@ -1439,6 +1434,39 @@ function endGame(won){
 /* ═══════════════════════════════════════════════════════════════
    16. RENDER & UTILITIES
    ═══════════════════════════════════════════════════════════════ */
+function showHeroesOfOld(){
+    const scores=JSON.parse(localStorage.getItem('norrt_scores')||'[]');
+    let existing=document.getElementById('heroes-of-old-overlay');
+    if(existing){existing.remove();return;}
+    const ov=document.createElement('div');
+    ov.id='heroes-of-old-overlay';
+    ov.style.cssText='position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;';
+    const box=document.createElement('div');
+    box.style.cssText='background:#0d0d0d;border:1px solid rgba(201,162,39,0.6);padding:22px 28px;max-width:520px;width:92%;max-height:80vh;overflow-y:auto;font-family:\'IM Fell English\',Georgia,serif;color:#fff;text-align:center;';
+    const title=document.createElement('h2');
+    title.textContent='✦ Heroes of Old ✦';
+    title.style.cssText='color:var(--gold,#c9a227);margin:0 0 14px;font-size:1.15em;letter-spacing:.05em;';
+    box.appendChild(title);
+    if(!scores.length){
+        const empty=document.createElement('p');empty.textContent='No fellowship hath yet completed the journey.';empty.style.color='#888';box.appendChild(empty);
+    }else{
+        scores.forEach((s,i)=>{
+            const p=document.createElement('p');
+            p.style.cssText=`color:${s.won?'var(--gold,#c9a227)':'#888'};margin:4px 0;font-size:.93em;`;
+            const detail=s.won?`${s.turns} trials · ${s.wealth} gold · ${s.align||'Unknown'}`:`${s.turns} trials · ${s.align||'Unknown'}`;
+            p.textContent=`${i+1}. ${s.won?'✦':'✧'} ${s.team} · ${detail} · ${s.date}`;
+            box.appendChild(p);
+        });
+    }
+    const close=document.createElement('button');
+    close.textContent='Close';close.className='px-btn';
+    close.style.cssText='margin-top:16px;';
+    close.onclick=()=>ov.remove();
+    box.appendChild(close);
+    ov.appendChild(box);
+    ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+    document.body.appendChild(ov);
+}
 function showScreen(id){
     document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
