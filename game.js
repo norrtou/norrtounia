@@ -1043,11 +1043,29 @@ function nextTurn(){
 function passiveHeal(){party.forEach(h=>{if(h.hp<=0||h.hp>=h.maxHp)return;if(Math.random()>0.40+h.sta*0.015)return;const a=Math.max(1,Math.floor(h.maxHp*(rand(1,3)+Math.floor(h.sta/5))/100));h.hp=Math.min(h.hp+a,h.maxHp);log(pick(GAME_DATA.healFlavors).replace('{name}',h.name).replace('{hp}',`+${a} HP`));SFX.heal();});}
 function doTreasuryEvent(){const gold=rand(5,50),gems=Math.random()<0.35?rand(1,3):0;treasury.gold+=gold;treasury.gems+=gems;log(pick(GAME_DATA.treasuryFlavors));log(`✦ ${gold} gold coins${gems?` and ${gems} precious gem${gems>1?'s':''}`:''}  secured!`);SFX.treasury();}
 
+function fullPartyRest(flavour){
+    party.forEach(h=>{
+        if(!h||h.hp<=0)return;
+        const missing=h.maxHp-h.hp;
+        h.hp=h.maxHp;
+        // Reset all ability cooldowns
+        Object.keys(h.abilityCooldowns).forEach(id=>{h.abilityCooldowns[id]=0;});
+        log(`${h.name} fully rests.${missing>0?' ('+missing+' HP restored)':' (already at full HP)'} All abilities refreshed.`);
+    });
+    if(flavour)log(flavour);
+    SFX.heal();
+}
+
 function doUneventfulTurn(){
     const ev=pick(GAME_DATA.uneventfulEvents);logPrompt(ev.text);
+    const restTip=
+        `${tc('hp','💚 Full rest — restores all HP to maximum')}<br>`+
+        `${tc('good','✓ Resets all ability cooldowns')}<br>`+
+        `${tc('good','✓ Clears any lingering afflictions')}<br><br>`+
+        `${tc('lore','The fellowship takes a full respite. One trial spent.')}`;
     setChoices([
         {label:'[1] Press on through the wood',tooltip:tc('lore','→ Safe — continue forward, no effect'),action:()=>{log(ev.pressOn);SFX.neutral();setTimeout(nextTurn,40);}},
-        {label:'[2] Rest and recover',action:()=>{party.forEach(h=>{if(h.hp<=0)return;const hl=Math.max(2,Math.floor(h.maxHp*(0.06+h.sta*0.003)));h.hp=Math.min(h.hp+hl,h.maxHp);log(`${h.name} rests. +${hl} HP`);});log(ev.restFlavour);SFX.heal();setTimeout(nextTurn,40);},tooltip:tc('hp','💚 Heals ~6–9% max HP')+' (STA improves this)'},
+        {label:'[2] Rest and recover',tooltip:restTip,action:()=>{fullPartyRest(ev.restFlavour);setTimeout(nextTurn,40);}},
         {label:'[3] Search the surroundings',action:()=>{const best=Math.max(...party.filter(h=>h.hp>0).map(h=>h.lck));if(Math.random()<0.12+best*0.008)giveLoot();else log('Naught of value is found here.');log(ev.searchFlavour);SFX.neutral();setTimeout(nextTurn,40);},tooltip:tc('item','🍀 ~12–25% chance to find an item')+' (LCK improves this)'},
     ]);
 }
