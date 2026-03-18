@@ -472,7 +472,7 @@ const battle={
     inspiredHero:null,      // heroIdx
 };
 
-function resetBattle(){Object.assign(battle,{monster:null,order:[],turnIdx:0,round:1,active:false,charmUsed:false,monsterAtkMult:1.0,monsterAtkMultRounds:0,heroDmgMult:{},monsterSkipTurns:0,heroShielded:{},heroPhaseShift:{},heroRegen:{},heroRage:{},combustPrimed:{},judgmentPrimed:{},dotEffects:[],monsterResistNullified:false,monsterAttackedLastRound:false,spiritTotemRounds:0,inspiredHero:null});}
+function resetBattle(){Object.assign(battle,{monster:null,monsters:[],targetIdx:0,isPack:false,order:[],turnIdx:0,round:1,active:false,charmUsed:false,monsterAtkMult:1.0,monsterAtkMultRounds:0,heroDmgMult:{},monsterSkipTurns:0,heroShielded:{},heroPhaseShift:{},heroRegen:{},heroRage:{},combustPrimed:{},judgmentPrimed:{},dotEffects:[],monsterResistNullified:false,monsterAttackedLastRound:false,spiritTotemRounds:0,inspiredHero:null});}
 
 /* ═══════════════════════════════════════════════════════════════
    6. ABILITY EFFECTS
@@ -493,10 +493,10 @@ const ABILITY_EFFECTS={
     action_surge:(h,hi)=>{
         log(`${h.name} surges — attacking twice!`);SFX.ability();
         resolveHeroHit(h,hi,pick(h.attackNames),1.0);
-        if(battle.monster.currentHp<=0){endCombat(true);return;}
+        if(handleMonsterDeath()){endCombat(true);return;}
         setTimeout(()=>{
-            if(battle.monster.currentHp>0)resolveHeroHit(h,hi,pick(h.attackNames),1.0);
-            if(battle.monster.currentHp<=0){endCombat(true);return;}
+            if(!allMonstersDead())resolveHeroHit(h,hi,pick(h.attackNames),1.0);
+            if(handleMonsterDeath()){endCombat(true);return;}
             finishAbilityTurn();
         },350);
     },
@@ -526,16 +526,16 @@ const ABILITY_EFFECTS={
         battle.monster.resistances={};          // nullify for this hit (sync)
         resolveHeroHit(h,hi,pick(h.attackNames),1.0);
         battle.monster.resistances=orig;         // restore immediately after sync hit
-        if(battle.monster.currentHp<=0){endCombat(true);return;}
+        if(handleMonsterDeath()){endCombat(true);return;}
         advanceBattleTurn();renderStats();setTimeout(processBattleTurn,300);
     },
     volley:(h,hi)=>{
         log(`${h.name} looses an Arrow Volley — two shots at 75% power!`);SFX.ability();
         resolveHeroHit(h,hi,pick(h.attackNames),0.75);
-        if(battle.monster.currentHp<=0){endCombat(true);return;}
+        if(handleMonsterDeath()){endCombat(true);return;}
         setTimeout(()=>{
-            if(battle.monster.currentHp>0)resolveHeroHit(h,hi,pick(h.attackNames),0.75);
-            if(battle.monster.currentHp<=0){endCombat(true);return;}
+            if(!allMonstersDead())resolveHeroHit(h,hi,pick(h.attackNames),0.75);
+            if(handleMonsterDeath()){endCombat(true);return;}
             finishAbilityTurn();
         },350);
     },
@@ -579,8 +579,8 @@ const ABILITY_EFFECTS={
         for(let s=0;s<3;s++){
             const sn=s;
             setTimeout(()=>{
-                if(battle.monster.currentHp>0)resolveHeroHit(h,hi,pick(h.attackNames),0.55);
-                if(battle.monster.currentHp<=0){endCombat(true);return;}
+                if(!allMonstersDead())resolveHeroHit(h,hi,pick(h.attackNames),0.55);
+                if(handleMonsterDeath()){endCombat(true);return;}
                 if(sn===2)finishAbilityTurn();
             },delay);
             delay+=280;
@@ -594,7 +594,7 @@ const ABILITY_EFFECTS={
         const stolen=Math.floor(dmg*0.60);
         h.hp=Math.min(h.hp+stolen,h.maxHp);
         log(`${h.name} drains ${stolen} HP back through Life Drain!`);
-        if(battle.monster.currentHp<=0){endCombat(true);return;}
+        if(handleMonsterDeath()){endCombat(true);return;}
         advanceBattleTurn();renderStats();setTimeout(processBattleTurn,350);
     },
     blood_surge:(h,hi)=>{const s=Math.floor(0.25*h.maxHp);h.hp=Math.max(1,h.hp-s);log(`${h.name} surges with Blood (sacrifice ${s} HP) — 2.5×!`);executeAttack(h,hi,2.5);},
@@ -978,41 +978,59 @@ function renderPortraitStrip(){
     }
     const mp=document.getElementById('monster-panel');
     if(mp){
-        if(battle.active&&battle.monster&&battle.monster.currentHp>0){
-            const m=battle.monster;
-            const mIdx=GAME_DATA.monsters.findIndex(x=>x.name===m.name);
-            const sIdx=m.spriteIdx??(mIdx>=0?mIdx:0);
-            const spr=monsterPortraitStyleSized(sIdx,66,84);
-            const hpPct=m.maxHp>0?m.currentHp/m.maxHp*100:0;
-            const hpCol=hpPct>66?'#c84040':hpPct>33?'#b85520':'#771010';
-            const dotInfo=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r`).join(', ')||'None';
-            const statTip=`<b>${m.name}</b><br><span style="color:#ff7733">ATK:${m.str}</span> INIT:${m.initiative??'?'} Rnd:${battle.round}${m.undead?'<br>☠ Undead':''}${battle.monsterResistNullified?'<br>⚠ Nullified':''}${dotInfo!=='None'?'<br>DoT: '+dotInfo:''}`;
-            const hpTip=`<span style="color:#6abf45">HP: ${m.currentHp}/${m.maxHp}</span>`;
-            mp.innerHTML=buildCard(spr,{
-                id:'monster-card',name:m.name,
-                sublabel:`${m.icon} Round ${battle.round}`,
-                hpPct,hpCol,dead:false,isLeader:false,isMonster:true,
-                items:[],statusIcons:monsterStatusIcons(),
-                statTip,hpTip,
+        if(battle.active&&battle.monsters.length>0&&!allMonstersDead()){
+            // Highest-initiative alive monster gets the crown
+            const leaderEntry=battle.order.filter(e=>e.type==='monster'&&e.entity.currentHp>0)
+                .reduce((b,e)=>!b||e.initiative>b.initiative?e:b,null);
+            const leaderEntity=leaderEntry?.entity;
+            mp.innerHTML=battle.monsters.map((m,idx)=>{
+                const mIdx=GAME_DATA.monsters.findIndex(x=>x.name===m.name);
+                const sIdx=m.spriteIdx??(mIdx>=0?mIdx:0);
+                const spr=monsterPortraitStyleSized(sIdx,66,84);
+                const dead=m.currentHp<=0;
+                const hpPct=dead?0:(m.maxHp>0?m.currentHp/m.maxHp*100:0);
+                const hpCol=hpPct>66?'#c84040':hpPct>33?'#b85520':'#771010';
+                const oe=battle.order.find(e=>e.type==='monster'&&e.entity===m);
+                const dotInfo=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r`).join(', ')||'None';
+                const statTip=`<b>${m.name}${m.isPackLeader?'<span style="color:#c9a227"> ★ Alpha</span>':''}</b><br><span style="color:#ff7733">ATK:${m.str}</span> INIT:${oe?.initiative??'?'} Rnd:${battle.round}${m.undead?'<br>☠ Undead':''}${battle.monsterResistNullified?'<br>⚠ Nullified':''}${dotInfo!=='None'&&m===battle.monster?'<br>DoT: '+dotInfo:''}`;
+                const hpTip=`<span style="color:#6abf45">HP: ${m.currentHp}/${m.maxHp}</span>`;
+                return buildCard(spr,{
+                    id:`monster-card-${idx}`,name:m.name,
+                    sublabel:dead?'✝ Fallen':`${m.icon} Round ${battle.round}`,
+                    hpPct,hpCol,dead:false,isLeader:m===leaderEntity,isMonster:true,
+                    items:[],statusIcons:(dead||m!==battle.monster)?[]:monsterStatusIcons(),
+                    statTip,hpTip,
+                });
+            }).join('');
+            // Wire tooltips, targeting highlight, and click handlers
+            battle.monsters.forEach((m,idx)=>{
+                const card=document.getElementById(`monster-card-${idx}`);
+                if(!card)return;
+                const dead=m.currentHp<=0;
+                const oe=battle.order.find(e=>e.type==='monster'&&e.entity===m);
+                const mData=GAME_DATA.monsters.find(x=>x.name===m.name);
+                const lorePart=mData?.lore?`<br><br>${tc('lore',mData.lore)}`:'';
+                const initDisp=oe?.initiative??'?';
+                const dotInfo2=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r×${d.rounds}`).join(', ')||'None';
+                const mHtml=dead
+                    ?`${tc('item',m.name)}<br><span style="color:#888">✝ Slain</span>`
+                    :`${tc('item',m.name)}${m.isPackLeader?` <span style="color:#c9a227">★ Alpha</span>`:''}${lorePart}<br><br>${tc('warn','ATK: '+m.str+(battle.monsterAtkMult!==1?' ×'+battle.monsterAtkMult.toFixed(2):''))}<br>INIT: ${initDisp} · Round: ${battle.round}${m.undead?'<br>'+tc('blood','☠ Undead'):''}${battle.monsterResistNullified?'<br>'+tc('warn','⚠ Nullified'):''}${dotInfo2!=='None'&&m===battle.monster?'<br>DoT: '+tc('warn',dotInfo2):''}`;
+                const hpHtml=`${tc('hp','HP: '+m.currentHp+'/'+m.maxHp)}`;
+                const spriteEl=card.querySelector('.portrait-sprite-wrap');
+                const nameEl=card.querySelector('.pi-name');
+                const hpEl=card.querySelector('.portrait-hp-wrap');
+                if(spriteEl)showTip(spriteEl,mHtml);
+                if(nameEl)showTip(nameEl,mHtml);
+                if(hpEl)showTip(hpEl,hpHtml);
+                if(dead){card.style.opacity='0.40';card.style.filter='grayscale(0.70)';}
+                else if(battle.isPack){
+                    card.classList.add('monster-selectable');
+                    if(m===battle.monster)card.classList.add('monster-targeted');
+                    card.addEventListener('click',()=>selectTarget(idx));
+                }
+                card.querySelectorAll('.status-icon').forEach(ic=>{const tip=ic.dataset.tip;if(tip)showTip(ic,tip);});
             });
         } else { mp.innerHTML=''; return; }
-        // Wire monster card tooltips
-        const mc=document.getElementById('monster-card');
-        if(mc){
-            const m=battle.monster;
-            const dotInfo=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r×${d.rounds}`).join(', ')||'None';
-            const mData=GAME_DATA.monsters.find(x=>x.name===m.name);
-            const lorePart=mData?.lore?`<br><br>${tc('lore',mData.lore)}`:'';
-            const mHtml=`${tc('item',m.name)}${lorePart}<br><br>${tc('warn','ATK: '+m.str+(battle.monsterAtkMult!==1?' ×'+battle.monsterAtkMult.toFixed(2):''))}<br>INIT: ${m.initiative??'?'} · Round: ${battle.round}${m.undead?'<br>'+tc('blood','☠ Undead'):''}${battle.monsterResistNullified?'<br>'+tc('warn','⚠ Resistances nullified'):''}${dotInfo!=='None'?'<br>DoT: '+tc('warn',dotInfo):''}`;
-            const hpHtml=`${tc('hp','HP: '+m.currentHp+'/'+m.maxHp)}`;
-            const spriteEl=mc.querySelector('.portrait-sprite-wrap');
-            const nameEl=mc.querySelector('.pi-name');
-            const hpEl=mc.querySelector('.portrait-hp-wrap');
-            if(spriteEl) showTip(spriteEl,mHtml);
-            if(nameEl)   showTip(nameEl,mHtml);
-            if(hpEl)     showTip(hpEl,hpHtml);
-            mc.querySelectorAll('.status-icon').forEach(ic=>{const tip=ic.dataset.tip;if(tip)showTip(ic,tip);});
-        }
     }
 }
 
@@ -1127,32 +1145,81 @@ function doCombat(){
     if(base.special==='honk')return doHonkEncounter();
     const scale=1+(turn/280)+(Math.random()*0.70-0.35);
     resetBattle();
-    battle.monster={...base,currentHp:Math.round(base.hp*scale),maxHp:Math.round(base.hp*scale),str:Math.max(1,Math.round(base.str*scale)),charmed:false,resistances:{}};
-    battle.active=true;
-    setMusicMood('battle');
-    logPrompt(`${battle.monster.icon} ${battle.monster.name} emerges from the shadows!`);
-    if(battle.monster.taunts&&Math.random()<0.30)log(pick(battle.monster.taunts));
+    const isPack=Math.random()<0.10&&!base.special;
+    battle.isPack=isPack;
+    const cohMod=partyAlignmentMod();
     const order=[];
     party.filter(h=>h.hp>0).forEach(h=>{const r=rollInitiative(h);h.lastInitiative=r;order.push({entity:h,type:'hero',initiative:r});});
-    const mi=rand(1,12)+Math.floor(battle.monster.maxHp/40);
-    battle.monster.initiative=mi;
-    order.push({entity:battle.monster,type:'monster',initiative:mi});
-    order.sort((a,b)=>b.initiative-a.initiative);
-    battle.order=[...order];battle.turnIdx=0;battle.round=1;
-    log(`Initiative: ${order.map(e=>`${e.type==='hero'?e.entity.name:battle.monster.name}(${e.initiative})`).join(' › ')}`);
-    const cohMod=partyAlignmentMod();
-    if(cohMod>0)log(`✦ Aligned fellowship — cohesion grants +${cohMod} to all initiative.`);
-    else if(cohMod<0)log(`⚠ Divided fellowship — alignment conflict: ${cohMod} to all initiative.`,'blood');
+    if(isPack){
+        const count=Math.random()<0.5?2:3;
+        const lScale=scale*1.30;
+        const leader={...base,currentHp:Math.round(base.hp*lScale),maxHp:Math.round(base.hp*lScale),str:Math.max(1,Math.round(base.str*lScale)),charmed:false,resistances:{},isPackLeader:true};
+        const monsters=[leader];
+        for(let i=1;i<count;i++){const fScale=scale*(0.60+Math.random()*0.10);monsters.push({...base,currentHp:Math.round(base.hp*fScale),maxHp:Math.round(base.hp*fScale),str:Math.max(1,Math.round(base.str*fScale)),charmed:false,resistances:{},isPackLeader:false});}
+        battle.monsters=monsters;battle.targetIdx=0;battle.monster=leader;battle.active=true;
+        const leaderInit=rand(8,16)+Math.floor(base.str/5);
+        leader.initiative=leaderInit;
+        order.push({entity:leader,type:'monster',initiative:leaderInit});
+        monsters.slice(1).forEach(f=>{const fi=Math.max(1,rand(1,Math.max(1,leaderInit-3)));f.initiative=fi;order.push({entity:f,type:'monster',initiative:fi});});
+        const packWord=packFlavour(base.name);
+        const intros=[`${base.icon} A ${packWord} of ${count} ${base.name}s descends upon the fellowship! The largest steps forward as their alpha.`,`${base.icon} The fellowship is surrounded by ${count} ${base.name}s. One — scarred and battle-hardened — snarls the others into formation.`,`${base.icon} From the shadows emerge ${count} ${base.name}s. Their leader fixes you with cold eyes before signalling the assault.`];
+        order.sort((a,b)=>b.initiative-a.initiative);
+        battle.order=[...order];battle.turnIdx=0;battle.round=1;
+        setMusicMood('battle');
+        logPrompt(pick(intros));
+        if(base.taunts&&Math.random()<0.30)log(pick(base.taunts));
+        log(`Initiative: ${order.map(e=>`${e.entity.name||e.entity.name}(${e.initiative})`).join(' › ')}`);
+        if(cohMod>0)log(`✦ Aligned fellowship — cohesion grants +${cohMod} to all initiative.`);
+        else if(cohMod<0)log(`⚠ Divided fellowship — alignment conflict: ${cohMod} to all initiative.`,'blood');
+        log(`Pack tactics: click a monster portrait to select your target.`);
+    } else {
+        battle.monster={...base,currentHp:Math.round(base.hp*scale),maxHp:Math.round(base.hp*scale),str:Math.max(1,Math.round(base.str*scale)),charmed:false,resistances:{},isPackLeader:false};
+        battle.monsters=[battle.monster];battle.targetIdx=0;battle.active=true;
+        const mi=rand(1,12)+Math.floor(battle.monster.maxHp/40);
+        battle.monster.initiative=mi;
+        order.push({entity:battle.monster,type:'monster',initiative:mi});
+        order.sort((a,b)=>b.initiative-a.initiative);
+        battle.order=[...order];battle.turnIdx=0;battle.round=1;
+        setMusicMood('battle');
+        logPrompt(`${battle.monster.icon} ${battle.monster.name} emerges from the shadows!`);
+        if(battle.monster.taunts&&Math.random()<0.30)log(pick(battle.monster.taunts));
+        log(`Initiative: ${order.map(e=>`${e.type==='hero'?e.entity.name:battle.monster.name}(${e.initiative})`).join(' › ')}`);
+        if(cohMod>0)log(`✦ Aligned fellowship — cohesion grants +${cohMod} to all initiative.`);
+        else if(cohMod<0)log(`⚠ Divided fellowship — alignment conflict: ${cohMod} to all initiative.`,'blood');
+    }
     log('━━━ Battle Round 1 ━━━');
     processBattleTurn();
 }
 
 function rollInitiative(h){return rand(1,20)+Math.floor(h.dex/4)+Math.floor(h.lck/5)+(h.isLeader?2:0)+partyAlignmentMod();}
+function allMonstersDead(){return battle.monsters.every(m=>m.currentHp<=0);}
+function updateTarget(){
+    if(battle.monster&&battle.monster.currentHp>0)return;
+    const best=battle.order.filter(e=>e.type==='monster'&&e.entity.currentHp>0)
+        .reduce((b,e)=>!b||e.initiative>b.initiative?e:b,null);
+    if(best){battle.targetIdx=battle.monsters.indexOf(best.entity);battle.monster=best.entity;}
+}
+function handleMonsterDeath(){
+    if(battle.monster&&battle.monster.currentHp>0)return false;
+    if(allMonstersDead())return true;
+    log(`${battle.monster.name} falls!`);updateTarget();renderStats();return false;
+}
+function selectTarget(idx){
+    if(!battle.active)return;
+    const m=battle.monsters[idx];if(!m||m.currentHp<=0)return;
+    battle.targetIdx=idx;battle.monster=m;
+    log(`The fellowship focuses their attack on ${m.name}!`);renderStats();
+}
+function packFlavour(n){
+    const w={Wolf:'pack',Goblin:'gang',Skeleton:'horde',Zombie:'horde',Orc:'warband',Bandit:'gang',Spider:'nest',Bat:'colony',Rat:'swarm',Vampire:'coven',Troll:'mob',Kobold:'swarm'};
+    return Object.entries(w).find(([k])=>n.includes(k))?.[1]||'group';
+}
 
 function processRoundEffects(){
     // DOTs
     battle.dotEffects=battle.dotEffects.filter(dot=>{
-        if(battle.monster.currentHp<=0)return false;
+        if(allMonstersDead())return false;
+        updateTarget();
         battle.monster.currentHp=Math.max(0,battle.monster.currentHp-dot.dmgPerRound);
         const col=DAMAGE_TYPES[dot.dmgType]?.color||'#fff';
         logHTML(`<span style="color:${col}">${dot.dmgPerRound} ${dot.dmgType} damage from ${dot.source}'s poison!</span>`);
@@ -1169,17 +1236,18 @@ function processRoundEffects(){
 
 function processBattleTurn(){
     if(!battle.active)return;
-    if(battle.monster.currentHp<=0)return endCombat(true);
+    if(allMonstersDead())return endCombat(true);
     if(party.every(h=>h.hp<=0))return endGame(false);
     // Skip dead entities
     for(let a=0;a<battle.order.length;a++){
+        if(!battle.active)return;
         const cur=battle.order[battle.turnIdx];
-        const dead=cur.type==='hero'?cur.entity.hp<=0:battle.monster.currentHp<=0;
+        const dead=cur.type==='hero'?cur.entity.hp<=0:cur.entity.currentHp<=0;
         if(!dead)break;
         advanceBattleTurn();
     }
     const cur=battle.order[battle.turnIdx];
-    if(cur.type==='monster')setTimeout(doMonsterTurn,550);
+    if(cur.type==='monster')setTimeout(()=>doMonsterTurn(cur.entity),550);
     else showHeroAction(cur.entity);
 }
 
@@ -1187,7 +1255,7 @@ function advanceBattleTurn(){
     battle.turnIdx=(battle.turnIdx+1)%battle.order.length;
     if(battle.turnIdx===0){
         battle.round++;processRoundEffects();
-        if(battle.monster.currentHp<=0){endCombat(true);return;}
+        if(allMonstersDead()){endCombat(true);return;}
         if(party.every(h=>h.hp<=0)){endGame(false);return;}
         // Re-sort by current mutable initiative (heroes earn/spend throughout the battle)
         battle.order.sort((a,b)=>b.initiative-a.initiative);
@@ -1195,19 +1263,19 @@ function advanceBattleTurn(){
     }
 }
 
-function doMonsterTurn(){
+function doMonsterTurn(actingMonster){
     if(!battle.active)return;
-    if(battle.monster.currentHp<=0)return endCombat(true);
-    if(battle.monsterSkipTurns>0){battle.monsterSkipTurns--;log(`${battle.monster.name} cannot act this turn!`);SFX.neutral();advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
-    if(battle.monster.charmed){battle.monster.charmed=false;log(`${battle.monster.name} is charmed — hesitates!`);SFX.charm();advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
+    if(actingMonster.currentHp<=0){advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
+    if(battle.monsterSkipTurns>0){battle.monsterSkipTurns--;log(`${actingMonster.name} cannot act this turn!`);SFX.neutral();advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
+    if(actingMonster.charmed){actingMonster.charmed=false;log(`${actingMonster.name} is charmed — hesitates!`);SFX.charm();advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
     const valid=party.filter((h,i)=>h.hp>0&&!(battle.heroPhaseShift[i]>0));
-    if(!valid.length){log(`${battle.monster.name} finds no valid target!`);advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
+    if(!valid.length){log(`${actingMonster.name} finds no valid target!`);advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
     const target=valid[Math.floor(Math.random()*valid.length)],ti=party.indexOf(target);
     if(battle.heroPhaseShift[ti]>0)battle.heroPhaseShift[ti]--;
-    const mDT=battle.monster.damageType||'physical',res=target.resistances?.[mDT]??0;
-    let rawDmg=Math.round(battle.monster.str*battle.monsterAtkMult)+rand(-3,3);
+    const mDT=actingMonster.damageType||'physical',res=target.resistances?.[mDT]??0;
+    let rawDmg=Math.round(actingMonster.str*battle.monsterAtkMult)+rand(-3,3);
     if(battle.heroShielded[ti]>0){battle.heroShielded[ti]--;log(`${target.name}'s shield absorbs the blow!`);SFX.shield();}
-    else{const dmg=Math.max(1,Math.round(rawDmg*(1-res/100)));target.hp-=dmg;log(`${battle.monster.name} strikes ${target.name}! ${dmg} damage${res>0?` (${res}% resisted)`:''}.`);battle.monster.str>24?SFX.heavyHit():SFX.strike();shake();}
+    else{const dmg=Math.max(1,Math.round(rawDmg*(1-res/100)));target.hp-=dmg;log(`${actingMonster.name} strikes ${target.name}! ${dmg} damage${res>0?` (${res}% resisted)`:''}.`);actingMonster.str>24?SFX.heavyHit():SFX.strike();shake();}
     battle.monsterAttackedLastRound=true;
     advanceBattleTurn();renderStats();setTimeout(processBattleTurn,500);
 }
@@ -1219,7 +1287,9 @@ function showHeroAction(hero){
     if(battle.heroRage[hi]>0)battle.heroRage[hi]--;
     const hpPct=battle.monster.currentHp/battle.monster.maxHp;
     const hpDesc=hpPct>0.75?'unharmed':hpPct>0.50?'wounded':hpPct>0.25?'badly hurt':'near death';
-    log(`${battle.monster.icon} ${battle.monster.name} is ${hpDesc}. (${battle.monster.currentHp}/${battle.monster.maxHp} HP)  ${hero.isLeader?'👑 ':''}${hero.name}'s turn.`);
+    const otherAlive=battle.monsters.filter(x=>x!==battle.monster&&x.currentHp>0);
+    const packInfo=otherAlive.length?` · ${otherAlive.length} other${otherAlive.length>1?'s':''} nearby`:'';
+    log(`${battle.monster.icon} ${battle.monster.name} is ${hpDesc}. (${battle.monster.currentHp}/${battle.monster.maxHp} HP)${packInfo}  ${hero.isLeader?'👑 ':''}${hero.name}'s turn.`);
 
     const sv=hero[hero.primaryStat];
     const minD=Math.max(1,Math.floor(sv*0.50)+1+hero.bonusDmg);
@@ -1289,17 +1359,9 @@ function showHeroAction(hero){
 /* Basic attack with morality-on-kill reward for choosing weaker option */
 function executeAttackWithMorality(hero,hi,mult,isBasic=false){
     resolveHeroHit(hero,hi,pick(hero.attackNames),mult);
-    if(battle.monster.currentHp<=0){
-        endCombat(true);
-        // If player used basic attack when at least one ability was available, reward morality
-        if(isBasic){
-            const hadAbility=hero.abilities.some(ab=>(hero.abilityCooldowns[ab.id]||0)===0);
-            if(hadAbility){
-                hero.morality=clamp(hero.morality+1,-100,100);
-                log(`${hero.name} dispatched the foe with honour. (Morality +1)`);
-            }
-        }
-        return;
+    if(handleMonsterDeath()){
+        if(isBasic){const hadAbility=hero.abilities.some(ab=>(hero.abilityCooldowns[ab.id]||0)===0);if(hadAbility){hero.morality=clamp(hero.morality+1,-100,100);log(`${hero.name} dispatched the foe with honour. (Morality +1)`);}}
+        endCombat(true);return;
     }
     advanceBattleTurn();renderStats();setTimeout(processBattleTurn,300);
 }
@@ -1314,7 +1376,7 @@ function executeAttackWithMorality(hero,hi,mult,isBasic=false){
    ───────────────────────────────────────────── */
 function executeAttack(hero,hi,mult,_guaranteeHit=false,overrideDmgType=null){
     resolveHeroHit(hero,hi,pick(hero.attackNames),mult,overrideDmgType);
-    if(battle.monster.currentHp<=0){endCombat(true);return;}   // ← FIXED
+    if(handleMonsterDeath()){endCombat(true);return;}
     advanceBattleTurn();
     renderStats();
     setTimeout(processBattleTurn,300);
@@ -1365,7 +1427,7 @@ function resolveHeroHit(hero,hi,atkName,mult,overrideDmgType=null){
  * Checks for monster death (shouldn't happen for buffs, but safety net).
  */
 function finishAbilityTurn(){
-    if(battle.monster.currentHp<=0){endCombat(true);return;}
+    if(allMonstersDead()){endCombat(true);return;}
     if(party.every(h=>h.hp<=0)){endGame(false);return;}
     advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);
 }
@@ -1381,15 +1443,20 @@ function endCombat(won){
     battle.active=false;
     if(party.every(h=>h.hp<=0))return endGame(false);
     if(won){
-        setMusicMood('normal');log(`${battle.monster.name} is defeated!`);SFX.good();
-        if(Math.random()<battle.monster.loot)giveLoot();
-        if(battle.monster.boon&&Math.random()<0.25){const h=aliveHero();if(h){if(battle.monster.boon.hp)h.hp=Math.min(h.hp+battle.monster.boon.hp,h.maxHp);if(battle.monster.boon.int)h.int+=battle.monster.boon.int;log(`Strange energy from ${battle.monster.name} flows into ${h.name}!`);}}
-        const bXP=battle.monster.xpValue??40;
-        const sf=battle.monster.str/(GAME_DATA.monsters.find(m=>m.name===battle.monster.name)?.str??battle.monster.str)||1;
+        setMusicMood('normal');
+        const primary=battle.monsters[0];
+        if(battle.isPack)log(`The ${packFlavour(primary.name)} of ${primary.name}s is defeated!`);
+        else log(`${primary.name} is defeated!`);
+        SFX.good();
+        // Loot: full chance from leader, half from followers
+        battle.monsters.forEach((m,i)=>{if(Math.random()<m.loot*(i===0?1:0.50))giveLoot();});
+        // Boon from leader only
+        if(primary.boon&&Math.random()<0.25){const h=aliveHero();if(h){if(primary.boon.hp)h.hp=Math.min(h.hp+primary.boon.hp,h.maxHp);if(primary.boon.int)h.int+=primary.boon.int;log(`Strange energy from ${primary.name} flows into ${h.name}!`);}}
         const ldr=party.find(h=>h&&h.isLeader&&h.hp>0);
         const inspireBonus=ldr?Math.ceil(ldr.leadership/5):0;
         if(ldr&&inspireBonus>0)log(`${ldr.name}'s inspiring presence grants +${inspireBonus} XP to all.`);
-        party.filter(h=>h.hp>0).forEach(h=>grantXP(h,Math.round(bXP*sf)+inspireBonus));
+        const totalXP=battle.monsters.reduce((sum,m)=>{const bXP=m.xpValue??40;const baseStr=GAME_DATA.monsters.find(x=>x.name===m.name)?.str??m.str;const sf=m.str/baseStr||1;return sum+Math.round(bXP*(m.isPackLeader?sf:sf*0.60));},0);
+        party.filter(h=>h.hp>0).forEach(h=>grantXP(h,totalXP+inspireBonus));
     }
     renderStats();setTimeout(nextTurn,700);
 }

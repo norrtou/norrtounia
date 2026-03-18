@@ -101,6 +101,12 @@ body{
     justify-content: flex-start; /* portrait hugs the title */
     min-width: 0;
 }
+.monster-selectable{ cursor: pointer; }
+.monster-selectable:hover{ border-color: rgba(180,50,50,.85) !important; }
+.monster-targeted{
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 10px rgba(201,162,39,0.40);
+}
 
 /* Centre — title block, never squished */
 #site-header{
