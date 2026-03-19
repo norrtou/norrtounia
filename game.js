@@ -1350,6 +1350,16 @@ function doUneventfulTurn(){
 /* ═══════════════════════════════════════════════════════════════
    11. SCENARIO — with stat-gated bonus options
    ═══════════════════════════════════════════════════════════════ */
+function moralScenIcon(m){
+    if(!m)return '';
+    return m>0?`<span style="color:#e8c45a">✦</span> `:`<span style="color:#cc3333">☠</span> `;
+}
+function moralScenTip(m){
+    if(!m)return '';
+    return m>0
+        ?`<br><span style="color:#6abf45">⚖ Morality +${m} — a righteous deed</span>`
+        :`<br><span style="color:#cc3333">⚖ Morality ${m} — a dark mark upon the soul</span>`;
+}
 function doScenario(){
     const ev=pick(GAME_DATA.scenarios);logPrompt(ev.text);
     const typeIcon={'good':tc('good','✦ Favourable'),'bad':tc('warn','⚠ Risky'),'neutral':tc('lore','~ Uncertain')};
@@ -1367,12 +1377,13 @@ function doScenario(){
                 `${tc('lore','· 35% chance of a hidden reward')}<br>`+
                 `${tc('lore','· Possible: item find · +1 stat · gold coins')}`:'')+
             (opt.bonus?`<br>${tc('good','Grants a bonus')}`:'')+
-            (opt.item?`<br>${tc('item','May yield an item')}`:'');
-        return {label:`[${i+1}] ${opt.text}`,tooltip:tip,action:()=>resolveScenario(opt)};
+            (opt.item?`<br>${tc('item','May yield an item')}`:'') +
+            moralScenTip(opt.morality);
+        return {label:`${moralScenIcon(opt.morality)}[${i+1}] ${opt.text}`,tooltip:tip,action:()=>resolveScenario(opt)};
     });
     if(ev.gated){ev.gated.forEach(g=>{const hero=party.find(h=>h.hp>0&&h[g.requires.stat]>=g.requires.min);if(hero){
-            const gTip=`${tc('good','✦ Guaranteed success')}<br>${hero.name} meets the requirement (${g.requires.stat.toUpperCase()} ${hero[g.requires.stat]} ≥ ${g.requires.min})<br><br>${tc('lore',g.effect||g.text)}${g.bonus?'<br>'+tc('good','Grants a bonus'):''}${g.item?'<br>'+tc('item','Yields an item'):''}`;
-            choices.push({label:`[${choices.length+1}] [${g.requires.stat.toUpperCase()} ${g.requires.min}+] ${hero.name}: ${g.text}`,tooltip:gTip,action:()=>resolveGated(hero,g),isGated:true});
+            const gTip=`${tc('good','✦ Guaranteed success')}<br>${hero.name} meets the requirement (${g.requires.stat.toUpperCase()} ${hero[g.requires.stat]} ≥ ${g.requires.min})<br><br>${tc('lore',g.effect||g.text)}${g.bonus?'<br>'+tc('good','Grants a bonus'):''}${g.item?'<br>'+tc('item','Yields an item'):''}${moralScenTip(g.morality)}`;
+            choices.push({label:`${moralScenIcon(g.morality)}[${choices.length+1}] [${g.requires.stat.toUpperCase()} ${g.requires.min}+] ${hero.name}: ${g.text}`,tooltip:gTip,action:()=>resolveGated(hero,g),isGated:true});
         }});}
     setChoices(choices);
 }
