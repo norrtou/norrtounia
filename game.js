@@ -942,6 +942,7 @@ function buildCard(spr,data){
           ? `<span class="pi-dead">✝ Slain</span>`
           : `<span class="${nameCls}">${name}<span class="stat-tooltip">${statTip}</span></span>
              <span class="pi-sub">${sublabel}<span class="stat-tooltip">${statTip}</span></span>
+             <div class="pi-gap"></div>
              <div class="pi-items">${itemHTML}</div>`
         }
     </div>`;
