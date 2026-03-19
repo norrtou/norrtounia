@@ -772,3 +772,48 @@ body{
 /* Remove old CSS tooltip remnants — all tooltips are now JS-driven */
 .stat-tooltip, .si-tip, .item-tip, .hp-tip, .setup-tooltip, .choice-tip,
 .log-inline-tip, .log-item-tip { display:none !important; }
+
+/* ══════════════════════════════════════════════════
+   DICE OVERLAY — shown on portrait card during action
+══════════════════════════════════════════════════ */
+.dice-overlay{
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    pointer-events: none;
+    border: 1px solid rgba(201,162,39,.30);
+}
+.dice-spin{
+    font-family: var(--ff);
+    font-size: clamp(22px, 2.5vw, 30px);
+    font-weight: bold;
+    color: rgba(201,162,39,.55);
+    line-height: 1;
+    display: block;
+}
+.dice-result{
+    font-family: var(--ff);
+    font-size: clamp(24px, 2.7vw, 32px);
+    font-weight: bold;
+    line-height: 1;
+    display: block;
+    text-shadow: 0 0 16px currentColor;
+    animation: diceSettle .22s ease-out;
+}
+.dice-tier{
+    font-family: var(--ff);
+    font-size: clamp(6px, .55vw, 8px);
+    margin-top: 4px;
+    text-align: center;
+    letter-spacing: .05em;
+    display: block;
+}
+@keyframes diceSettle{
+    from{ transform: scale(1.45); opacity:.20; }
+    to  { transform: scale(1.00); opacity:1.0; }
+}

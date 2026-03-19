@@ -470,9 +470,60 @@ const battle={
     monsterAttackedLastRound:false,
     spiritTotemRounds:0,
     inspiredHero:null,      // heroIdx
+    currentRoll:null,       // {roll,label,color,mult} — d20 result for current action
 };
 
-function resetBattle(){Object.assign(battle,{monster:null,monsters:[],targetIdx:0,isPack:false,order:[],turnIdx:0,round:1,active:false,charmUsed:false,monsterAtkMult:1.0,monsterAtkMultRounds:0,heroDmgMult:{},monsterSkipTurns:0,heroShielded:{},heroPhaseShift:{},heroRegen:{},heroRage:{},combustPrimed:{},judgmentPrimed:{},dotEffects:[],monsterResistNullified:false,monsterAttackedLastRound:false,spiritTotemRounds:0,inspiredHero:null});}
+function resetBattle(){Object.assign(battle,{monster:null,monsters:[],targetIdx:0,isPack:false,order:[],turnIdx:0,round:1,active:false,charmUsed:false,monsterAtkMult:1.0,monsterAtkMultRounds:0,heroDmgMult:{},monsterSkipTurns:0,heroShielded:{},heroPhaseShift:{},heroRegen:{},heroRage:{},combustPrimed:{},judgmentPrimed:{},dotEffects:[],monsterResistNullified:false,monsterAttackedLastRound:false,spiritTotemRounds:0,inspiredHero:null,currentRoll:null});}
+
+/* ═══════════════════════════════════════════════════════════════
+   D20 DICE SYSTEM
+   rollD20()     — returns {roll,label,color,mult}
+   getDiceMult() — returns battle.currentRoll.mult or 1.0
+   withDiceRoll(heroIdx, fn) — shows animation, then fires fn()
+   showDiceRoll(heroIdx, result, cb) — portrait overlay animation
+   ═══════════════════════════════════════════════════════════════ */
+function rollD20(){
+    const r=Math.floor(Math.random()*20)+1;
+    if(r===1) return{roll:r,label:'Fumble!',  color:'#cc2222',mult:0.25};
+    if(r<=5)  return{roll:r,label:'Poor',     color:'#c87830',mult:0.50};
+    if(r<=10) return{roll:r,label:'Partial',  color:'#c8c030',mult:0.75};
+    if(r<=15) return{roll:r,label:'Success',  color:'#ffffff',mult:1.00};
+    if(r<=19) return{roll:r,label:'Strong!',  color:'#6abf45',mult:1.30};
+    return           {roll:r,label:'CRITICAL!',color:'#c9a227',mult:2.00};
+}
+function getDiceMult(){return battle.currentRoll?battle.currentRoll.mult:1.0;}
+
+function showDiceRollOnCard(cardId,result,cb){
+    const card=document.getElementById(cardId);
+    if(!card){setTimeout(cb,0);return;}
+    const ov=document.createElement('div');
+    ov.className='dice-overlay';
+    ov.innerHTML=`<span class="dice-spin">${Math.floor(Math.random()*20)+1}</span>`;
+    card.appendChild(ov);
+    const iv=setInterval(()=>{
+        const s=ov.querySelector('.dice-spin');
+        if(s)s.textContent=Math.floor(Math.random()*20)+1;
+    },70);
+    setTimeout(()=>{
+        clearInterval(iv);
+        ov.innerHTML=`<span class="dice-result" style="color:${result.color}">${result.roll}</span>`+
+                     `<span class="dice-tier"   style="color:${result.color}">${result.label}</span>`;
+    },1300);
+    setTimeout(()=>{ov.remove();cb();},2200);
+}
+
+function withDiceRoll(heroIdx,actionFn){
+    const result=rollD20();
+    battle.currentRoll=result;
+    clearChoices();
+    const hero=party[heroIdx];
+    logHTML(`${hero?hero.name:'Hero'} raises the die — 🎲 `+
+        `<span style="color:${result.color};font-weight:bold">${result.roll}</span> `+
+        `<span style="color:${result.color}">${result.label}</span>`);
+    showDiceRollOnCard(`portrait-card-${heroIdx}`,result,actionFn);
+}
+
+const DICE_TIP=`<br><br><span style="color:#888888">🎲 Roll: 1=Fumble×¼ · 2–5=Poor×½ · 6–10=Partial×¾ · 11–15=Hit×1 · 16–19=Strong×1.3 · 20=Crit×2</span>`;
 
 /* ═══════════════════════════════════════════════════════════════
    6. ABILITY EFFECTS
@@ -486,10 +537,10 @@ const ABILITY_EFFECTS={
 
     /* ── Warriors ── */
     shield_wall:(h,hi)=>{battle.heroShielded[hi]=(battle.heroShielded[hi]||0)+1;log(`${h.name} raises their shield — the next blow will be absorbed.`);SFX.shield();finishAbilityTurn();},
-    rallying_cry:(h)=>{const heal=Math.floor(0.12*h.maxHp);party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+heal,x.maxHp);});const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} sounds a Rallying Cry! All allies recover ${heal} HP. (${h.name} spends ${cost} HP in the effort)`);SFX.ability();finishAbilityTurn();},
+    rallying_cry:(h)=>{const heal=Math.max(1,Math.round(Math.floor(0.12*h.maxHp)*getDiceMult()));party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+heal,x.maxHp);});const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} sounds a Rallying Cry! All allies recover ${heal} HP. (${h.name} spends ${cost} HP in the effort)`);SFX.ability();finishAbilityTurn();},
     rage:(h,hi)=>{battle.heroRage[hi]=3;log(`${h.name} enters a RAGE! +70% damage for 3 rounds.`);SFX.ability();finishAbilityTurn();},
     reckless_atk:(h,hi)=>{log(`${h.name} swings a Reckless Attack — 2× power!`);executeAttack(h,hi,2.0);},
-    second_wind:(h)=>{const heal=Math.floor(0.20*h.maxHp);h.hp=Math.min(h.hp+heal,h.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} finds a Second Wind! +${heal} HP. (Morality −1 — self-preservation over the mission)`);SFX.heal();finishAbilityTurn();},
+    second_wind:(h)=>{const heal=Math.max(1,Math.round(Math.floor(0.20*h.maxHp)*getDiceMult()));h.hp=Math.min(h.hp+heal,h.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} finds a Second Wind! +${heal} HP. (Morality −1 — self-preservation over the mission)`);SFX.heal();finishAbilityTurn();},
     action_surge:(h,hi)=>{
         log(`${h.name} surges — attacking twice!`);SFX.ability();
         resolveHeroHit(h,hi,pick(h.attackNames),1.0);
@@ -502,9 +553,9 @@ const ABILITY_EFFECTS={
     },
 
     /* ── Holy ── */
-    lay_on_hands:(h)=>{const w=party.filter(x=>x.hp>0&&x.hp/x.maxHp<=0.30);const t=w.length?w[0]:h;const a=w.length?t.maxHp:Math.floor(0.40*h.maxHp);t.hp=Math.min(t.hp+a,t.maxHp);log(`${h.name} lays hands on ${t.name}! +${a} HP.`);SFX.heal();finishAbilityTurn();},
+    lay_on_hands:(h)=>{const w=party.filter(x=>x.hp>0&&x.hp/x.maxHp<=0.30);const t=w.length?w[0]:h;const a=Math.max(1,Math.round((w.length?t.maxHp:Math.floor(0.40*h.maxHp))*getDiceMult()));t.hp=Math.min(t.hp+a,t.maxHp);log(`${h.name} lays hands on ${t.name}! +${a} HP.`);SFX.heal();finishAbilityTurn();},
     divine_smite:(h,hi)=>{const isEvil=DAMAGE_TYPES[battle.monster.damageType]?.alignment==='dark'||battle.monster.undead;const mult=isEvil?2.5:2.0;log(`${h.name} calls Divine Smite!${isEvil?' Extra judgement against this evil foe!':''}`);executeAttack(h,hi,mult,false,'holy');},
-    divine_heal:(h)=>{const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const a=Math.floor(0.35*t.maxHp);t.hp=Math.min(t.hp+a,t.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} channels Divine Heal to ${t.name}! +${a} HP. (Morality −1 — cannot save everyone)`);SFX.heal();finishAbilityTurn();},
+    divine_heal:(h)=>{const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const a=Math.max(1,Math.round(Math.floor(0.35*t.maxHp)*getDiceMult()));t.hp=Math.min(t.hp+a,t.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} channels Divine Heal to ${t.name}! +${a} HP. (Morality −1 — cannot save everyone)`);SFX.heal();finishAbilityTurn();},
     turn_undead:(h,hi)=>{const isU=!!battle.monster.undead;if(!isU){battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);log(`${h.name} invokes Turn Undead — the creature is stunned!`);}else{log(`${h.name} invokes Turn Undead! Holy power blazes against the undead!`);}executeAttack(h,hi,isU?3.0:1.0,false,'holy');},
     holy_aegis:(h)=>{party.forEach((_,i)=>{battle.heroShielded[i]=(battle.heroShielded[i]||0)+1;});const cost=Math.min(8,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} raises Holy Aegis — whole party shielded! (${h.name} spends ${cost} HP in divine exertion)`);SFX.shield();finishAbilityTurn();},
     judgment:(h,hi)=>{battle.judgmentPrimed[hi]=true;log(`${h.name} marks ${battle.monster.name} with Judgment!`);SFX.ability();finishAbilityTurn();},
@@ -974,9 +1025,10 @@ function renderPortraitStrip(){
         // During battle, crown goes to the hero with the highest current initiative (next to act)
         let crownHeroIdx=null;
         if(battle.active){
-            const heroEntries=battle.order.filter(e=>e.type==='hero'&&e.entity.hp>0);
-            const topEntry=heroEntries.reduce((b,e)=>!b||e.initiative>b.initiative?e:b,null);
-            if(topEntry)crownHeroIdx=party.indexOf(topEntry.entity);
+            // Crown goes on the hero whose turn it currently is
+            const cur=battle.order[battle.turnIdx];
+            if(cur&&cur.type==='hero'&&cur.entity.hp>0)
+                crownHeroIdx=party.indexOf(cur.entity);
         }
         hp.innerHTML=order.map(({h,i})=>{
             const dead=h.hp<=0;
@@ -1086,9 +1138,13 @@ function renderPortraitStrip(){
                 const dotInfo=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r`).join(', ')||'None';
                 const statTip=`<b>${m.name}${m.isPackLeader?'<span style="color:#c9a227"> ★ Alpha</span>':''}</b><br><span style="color:#ff7733">ATK:${m.str}</span> INIT:${oe?.initiative??'?'} Rnd:${battle.round}${m.undead?'<br>☠ Undead':''}${battle.monsterResistNullified?'<br>⚠ Nullified':''}${dotInfo!=='None'&&m===battle.monster?'<br>DoT: '+dotInfo:''}`;
                 const hpTip=`<span style="color:#6abf45">HP: ${m.currentHp}/${m.maxHp}</span>`;
+                const typeParts=[];
+                if(m.undead)typeParts.push('<span style="color:#cc3333">☠ Undead</span>');
+                if(m.isPackLeader&&battle.isPack)typeParts.push('<span style="color:#c9a227">★ Alpha</span>');
+                const typeTag=typeParts.length?'<br>'+typeParts.join(' · '):'';
                 return buildCard(spr,{
                     id:`monster-card-${idx}`,name:m.name,
-                    sublabel:dead?'✝ Fallen':`${m.icon} Round ${battle.round}`,
+                    sublabel:dead?'✝ Fallen':`${m.icon} Round ${battle.round}${typeTag}`,
                     hpPct,hpCol,dead:false,isLeader:m===leaderEntity,isMonster:true,
                     items:[],statusIcons:(dead||m!==battle.monster)?[]:monsterStatusIcons(),
                     statTip,hpTip,
@@ -1104,9 +1160,15 @@ function renderPortraitStrip(){
                 const lorePart=mData?.lore?`<br><br>${tc('lore',mData.lore)}`:'';
                 const initDisp=oe?.initiative??'?';
                 const dotInfo2=battle.dotEffects.filter(d=>!d.targetType||d.targetType==='monster').map(d=>`${d.dmgType} ${d.dmgPerRound}/r×${d.rounds}`).join(', ')||'None';
+                const undeadBlock=m.undead
+                    ?`<br><br><span style="color:#cc3333;font-weight:bold">☠ Undead</span><br>`+
+                     `<span style="color:#aaaaaa;font-style:italic">A creature denied true death — its body animated by dark will rather than life. Neither hunger nor fear moves it; only the purpose bound into its bones.</span><br><br>`+
+                     `${tc('good','✦ Holy damage ×1.5')} · ${tc('skill','Turn Undead ×3.0 + stun')}<br>`+
+                     `<span style="color:#888">☣ Immune to poison · Necrotic magic may restore rather than harm</span>`
+                    :'';
                 const mHtml=dead
                     ?`${tc('item',m.name)}<br><span style="color:#888">✝ Slain</span>`
-                    :`${tc('item',m.name)}${m.isPackLeader?` <span style="color:#c9a227">★ Alpha</span>`:''}${lorePart}<br><br>${tc('warn','ATK: '+m.str+(battle.monsterAtkMult!==1?' ×'+battle.monsterAtkMult.toFixed(2):''))}<br>INIT: ${initDisp} · Round: ${battle.round}${m.undead?'<br>'+tc('blood','☠ Undead'):''}${battle.monsterResistNullified?'<br>'+tc('warn','⚠ Nullified'):''}${dotInfo2!=='None'&&m===battle.monster?'<br>DoT: '+tc('warn',dotInfo2):''}`;
+                    :`${tc('item',m.name)}${m.isPackLeader?` <span style="color:#c9a227">★ Alpha</span>`:''}${lorePart}<br><br>${tc('warn','ATK: '+m.str+(battle.monsterAtkMult!==1?' ×'+battle.monsterAtkMult.toFixed(2):''))}<br>INIT: ${initDisp} · Round: ${battle.round}${undeadBlock}${battle.monsterResistNullified?'<br>'+tc('warn','⚠ Nullified'):''}${dotInfo2!=='None'&&m===battle.monster?'<br>DoT: '+tc('warn',dotInfo2):''}`;
                 const hpHtml=`${tc('hp','HP: '+m.currentHp+'/'+m.maxHp)}`;
                 const spriteEl=card.querySelector('.portrait-sprite-wrap');
                 const nameEl=card.querySelector('.pi-name');
@@ -1307,6 +1369,7 @@ function doCombat(){
         else if(cohMod<0)log(`⚠ Divided fellowship — alignment conflict: ${cohMod} to all initiative.`,'blood');
     }
     log('━━━ Battle Round 1 ━━━');
+    renderStats();
     processBattleTurn();
 }
 
@@ -1371,6 +1434,7 @@ function processBattleTurn(){
 }
 
 function advanceBattleTurn(){
+    battle.currentRoll=null;
     battle.turnIdx=(battle.turnIdx+1)%battle.order.length;
     if(battle.turnIdx===0){
         battle.round++;processRoundEffects();
@@ -1389,14 +1453,31 @@ function doMonsterTurn(actingMonster){
     if(actingMonster.charmed){actingMonster.charmed=false;log(`${actingMonster.name} is charmed — hesitates!`);SFX.charm();advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
     const valid=party.filter((h,i)=>h.hp>0&&!(battle.heroPhaseShift[i]>0));
     if(!valid.length){log(`${actingMonster.name} finds no valid target!`);advanceBattleTurn();renderStats();setTimeout(processBattleTurn,400);return;}
-    const target=valid[Math.floor(Math.random()*valid.length)],ti=party.indexOf(target);
-    if(battle.heroPhaseShift[ti]>0)battle.heroPhaseShift[ti]--;
-    const mDT=actingMonster.damageType||'physical',res=target.resistances?.[mDT]??0;
-    let rawDmg=Math.round(actingMonster.str*battle.monsterAtkMult)+rand(-3,3);
-    if(battle.heroShielded[ti]>0){battle.heroShielded[ti]--;log(`${target.name}'s shield absorbs the blow!`);SFX.shield();}
-    else{const dmg=Math.max(1,Math.round(rawDmg*(1-res/100)));target.hp-=dmg;log(`${actingMonster.name} strikes ${target.name}! ${dmg} damage${res>0?` (${res}% resisted)`:''}.`);actingMonster.str>24?SFX.heavyHit():SFX.strike();shake();}
-    battle.monsterAttackedLastRound=true;
-    advanceBattleTurn();renderStats();setTimeout(processBattleTurn,500);
+    // Roll d20 for monster attack
+    const mIdx=battle.monsters.indexOf(actingMonster);
+    const result=rollD20();
+    battle.currentRoll=result;
+    logHTML(`${actingMonster.name} rolls — 🎲 `+
+        `<span style="color:${result.color};font-weight:bold">${result.roll}</span> `+
+        `<span style="color:${result.color}">${result.label}</span>`);
+    showDiceRollOnCard(`monster-card-${mIdx}`,result,()=>{
+        if(!battle.active)return;
+        const target=valid[Math.floor(Math.random()*valid.length)],ti=party.indexOf(target);
+        if(battle.heroPhaseShift[ti]>0)battle.heroPhaseShift[ti]--;
+        const mDT=actingMonster.damageType||'physical',res=target.resistances?.[mDT]??0;
+        const rawDmg=Math.max(1,Math.round((Math.round(actingMonster.str*battle.monsterAtkMult)+rand(-3,3))*result.mult));
+        if(battle.heroShielded[ti]>0){battle.heroShielded[ti]--;log(`${target.name}'s shield absorbs the blow!`);SFX.shield();}
+        else{
+            if(result.roll===1) logHTML(`<span style="color:#cc2222">A fumble — the strike glances off!</span>`);
+            else if(result.roll===20) logHTML(`<span style="color:#c9a227">✦ A devastating blow!</span>`);
+            const dmg=Math.max(1,Math.round(rawDmg*(1-res/100)));
+            target.hp-=dmg;
+            log(`${actingMonster.name} strikes ${target.name}! ${dmg} damage${res>0?` (${res}% resisted)`:''}.`);
+            actingMonster.str>24?SFX.heavyHit():SFX.strike();shake();
+        }
+        battle.monsterAttackedLastRound=true;
+        advanceBattleTurn();renderStats();setTimeout(processBattleTurn,500);
+    });
 }
 
 function showHeroAction(hero){
@@ -1429,10 +1510,10 @@ function showHeroAction(hero){
         `Initiative cost: ${tc('good',basicCost)} · Recovery on hit: ${tc('good','+2')} · Net: ${tc('good','+1 per round')}<br>`+
         `Current initiative: ${tc('stat',curInit)}<br><br>`+
         `${tc('good','✦ Choosing basic attack when stronger skills are available')} earns +1 Morality on a killing blow.<br>`+
-        `${tc('lore','The weak path is its own kind of courage.')}`;
+        `${tc('lore','The weak path is its own kind of courage.')}`+DICE_TIP;
     choices.push({label:`[1] ${atkName}`,tooltip:atkTip,action:()=>{
         if(oe)oe.initiative=Math.max(1,oe.initiative-basicCost);
-        executeAttackWithMorality(hero,hi,1.0,true);
+        withDiceRoll(hi,()=>executeAttackWithMorality(hero,hi,1.0,true));
     }});
 
     hero.abilities.forEach(ab=>{
@@ -1461,7 +1542,7 @@ function showHeroAction(hero){
             `Initiative cost: ${tc(costCol,abCost+' ('+costLabel+')')} · Recovery on hit: ${tc('good','+2')} · Net: ${tc(netCol,(netInit>=0?'+':'')+netInit)}<br>`+
             `Current initiative: ${tc('stat',curInit)}`+
             riskHint+
-            (battle.monster.name&&mData?`<br><br>${tc('lore',mData.name)}${mLore}`:'');
+            (battle.monster.name&&mData?`<br><br>${tc('lore',mData.name)}${mLore}`:'')+DICE_TIP;
         choices.push({
             label:`[${choices.length+1}] ${ab.name}`+(ready?'':'  ('+cd+' rnd)')+`  — ${ab.desc}`,
             disabled:!ready,
@@ -1473,7 +1554,7 @@ function showHeroAction(hero){
                 hero.abilityCooldowns[ab.id]=ab.cooldown;
                 const fn=ABILITY_EFFECTS[ab.id];
                 if(!fn){log(`[Error: ability ${ab.id} not found — skipping turn]`);finishAbilityTurn();return;}
-                fn(hero,hi);
+                withDiceRoll(hi,()=>fn(hero,hi));
             },
         });
     });
@@ -1550,6 +1631,8 @@ function resolveHeroHit(hero,hi,atkName,mult,overrideDmgType=null){
     let stat=hero[hero.primaryStat];
     let dmg=Math.max(1,Math.floor(stat*0.50)+rand(1,Math.max(2,Math.floor(stat*0.15)))+hero.bonusDmg);
     dmg=Math.round(dmg*mult);
+    // Apply d20 dice roll modifier
+    if(battle.currentRoll)dmg=Math.round(dmg*battle.currentRoll.mult);
     if(battle.heroRage[hi]>0)dmg=Math.round(dmg*1.70);
     if(battle.heroDmgMult[hi])dmg=Math.round(dmg*battle.heroDmgMult[hi].mult);
     if(battle.inspiredHero===hi){dmg=Math.round(dmg*2.0);battle.inspiredHero=null;log(`${hero.name} is Inspired — double damage!`);}
@@ -1573,6 +1656,9 @@ function resolveHeroHit(hero,hi,atkName,mult,overrideDmgType=null){
     // Initiative recovery: successful hit +2, resisted/poor hit +1 (capped at lastInitiative+5)
     const oeR=battle.order.find(e=>e.type==='hero'&&e.entity===hero);
     if(oeR){const recovery=res>30?1:2;oeR.initiative=Math.min(oeR.initiative+recovery,hero.lastInitiative+5);}
+    const dRoll=battle.currentRoll;
+    if(dRoll?.roll===1) logHTML(`<span style="color:#cc2222">A fumble — the blow barely lands!</span>`);
+    else if(dRoll?.roll===20) logHTML(`<span style="color:#c9a227">✦ A devastating strike!</span>`);
     const critSpan=isCrit?` <span style="color:#ffe033">✦ CRIT!</span>`:'';
     const moralSpan=moralBonus>0?` <span style="color:#aaaaaa">(+${moralBonus} aligned)</span>`:'';
     logHTML(`${hero.name} — ${atkName}: <span style="color:${dmgInfo.color}">${dmg} ${dmgInfo.label}</span>${critSpan}${moralSpan}`);
