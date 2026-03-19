@@ -453,7 +453,7 @@ body{
 .slot-card{
     flex: 1; background: #000;
     display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
+    align-items: center; justify-content: flex-start;
     gap: 4%; padding: 4% 3%;
     text-align: center;
     font-family: var(--ff);
@@ -482,6 +482,72 @@ body{
     color: #9966dd !important;
     position: relative;
 }
+
+/* ── Alignment line ────────────────────────────── */
+.slot-align {
+    display: block;
+    font-size: clamp(9px, .80vw, 12px);
+    letter-spacing: .03em;
+    margin-bottom: 2px;
+    cursor: help;
+    border-bottom: 1px dotted rgba(255,255,255,.12);
+    padding-bottom: 3px;
+}
+
+/* ── Stat grid ─────────────────────────────────── */
+.slot-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 10px;
+    width: 100%;
+    padding: 6px 2px;
+}
+.sg-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 1px 3px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.sg-label {
+    color: rgba(200,192,176,.45);
+    font-size: clamp(7px, .60vw, 9px);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.sg-num {
+    color: var(--white);
+    font-size: clamp(13px, 1.15vw, 18px);
+    font-weight: bold;
+    line-height: 1;
+    text-shadow: 0 0 8px rgba(255,255,255,.15);
+}
+.sg-hp  { color: #5cbf40; }
+.sg-primary .sg-num { color: #88ccff; text-shadow: 0 0 8px rgba(136,204,255,.35); }
+
+/* ── Badge row ─────────────────────────────────── */
+.slot-badges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 2px;
+}
+.slot-badge {
+    background: rgba(255,255,255,.03);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    font-size: clamp(8px, .65vw, 10px);
+    color: var(--dim1);
+    cursor: help;
+    transition: border-color .15s, color .15s;
+    white-space: nowrap;
+}
+.slot-badge:hover              { border-color: var(--goldbdr); color: var(--gold); }
+.slot-badge-abil               { color: rgba(153,102,221,.80); border-color: rgba(153,102,221,.25); }
+.slot-badge-abil:hover         { border-color: #9966dd; color: #c89eff; }
+.slot-badge-res                { color: rgba(255,119,51,.80); border-color: rgba(255,119,51,.25); }
+.slot-badge-res:hover          { border-color: #ff7733; color: #ffaa77; }
 .setup-ability-hint{ cursor: help; position: relative; }
 .setup-tooltip{
     display: none;
@@ -507,6 +573,7 @@ body{
     font-size: clamp(9px, .80vw, 13px);
     padding: 5px 10px; cursor: pointer;
     transition: all .18s; text-shadow: 1px 1px 0 #000;
+    margin-top: auto;
 }
 .bind-btn:hover{ border-color: var(--goldbdr); color: var(--amber); }
 .slot-card.locked .bind-btn{

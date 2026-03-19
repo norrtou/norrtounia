@@ -703,30 +703,63 @@ function renderSetup(){
     const c=document.getElementById('party-slots');c.innerHTML='';
     party.forEach((h,i)=>{
         const d=document.createElement('div');d.className=`slot-card${h.locked?' locked':''}`;
-        const resLines=Object.entries(h.resistances).filter(([,v])=>v!==0)
-            .map(([k,v])=>`<span style="color:#ff7733">${k}: ${v>0?'+':''}${v}%</span>`).join('<br>')||'None';
+        const hasRes=Object.values(h.resistances).some(v=>v!==0);
+        const mLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
+        const mColor=h.morality>30?'#e8c45a':h.morality>10?'#6abf45':h.morality>-10?'#aaaaaa':h.morality>-30?'#c8802a':'#cc3333';
         d.innerHTML=`
-            <span class="slot-name" data-setup-name="${i}" style="cursor:help">${h.isLeader?'👑 ':''}${alignIcon(h.morality)} ${h.name}</span>
-            <span class="slot-sub" data-setup-racejob="${i}">
+            <span class="slot-name">${h.isLeader?`<span class="slot-crown" data-setup-crown="${i}" style="cursor:help">👑 </span>`:''}<span data-setup-name="${i}" style="cursor:help">${h.name}</span></span>
+            <span class="slot-sub">
                 <span data-setup-race="${i}" style="cursor:help;border-bottom:1px dotted rgba(201,162,39,.4)">${h.race}</span>
                 ·
-                <span data-setup-job="${i}"  style="cursor:help;border-bottom:1px dotted rgba(201,162,39,.4)">${h.job}</span>
+                <span data-setup-job="${i}" style="cursor:help;border-bottom:1px dotted rgba(201,162,39,.4)">${h.job}</span>
             </span>
-            <span class="slot-stats" data-setup-stats1="${i}" style="cursor:help">HP:${h.hp} STR:${h.str} INT:${h.int} DEX:${h.dex}</span>
-            <span class="slot-stats" data-setup-stats2="${i}" style="cursor:help">CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span>
-            <span class="slot-sub" data-setup-atk="${i}" style="color:#c8c0b0;cursor:help">⚔ ${h.attackNames.join(' · ')}</span>
-            <span class="slot-sub ability-hint" style="cursor:help" data-setup-abil="${i}">⚡ ${h.attackNames.join(' · ')} · ${h.abilities.map(a=>a.name).join(' · ')}</span>
+            <span class="slot-align" data-setup-align="${i}" style="color:${mColor};cursor:help">⚖ ${mLabel} <span style="opacity:.60;font-size:.85em">(${h.morality>0?'+':''}${h.morality})</span></span>
+            <div class="slot-stat-grid" data-setup-stats1="${i}" style="cursor:help">
+                <div class="sg-cell"><span class="sg-label">HP</span><span class="sg-num sg-hp">${h.hp}</span></div>
+                <div class="sg-cell${h.primaryStat==='str'?' sg-primary':''}"><span class="sg-label">STR</span><span class="sg-num">${h.str}</span></div>
+                <div class="sg-cell${h.primaryStat==='int'?' sg-primary':''}"><span class="sg-label">INT</span><span class="sg-num">${h.int}</span></div>
+                <div class="sg-cell${h.primaryStat==='dex'?' sg-primary':''}"><span class="sg-label">DEX</span><span class="sg-num">${h.dex}</span></div>
+                <div class="sg-cell"><span class="sg-label">CHA</span><span class="sg-num">${h.cha}</span></div>
+                <div class="sg-cell"><span class="sg-label">STA</span><span class="sg-num">${h.sta}</span></div>
+                <div class="sg-cell"><span class="sg-label">LCK</span><span class="sg-num">${h.lck}</span></div>
+            </div>
+            <div class="slot-badges">
+                <span class="slot-badge" data-setup-atk="${i}" style="cursor:help">⚔ Attacks</span>
+                <span class="slot-badge slot-badge-abil" data-setup-abil="${i}" style="cursor:help">⚡ Abilities</span>
+                ${hasRes?`<span class="slot-badge slot-badge-res" data-setup-res="${i}" style="cursor:help">🛡 Resists</span>`:''}
+            </div>
             <button class="bind-btn" onclick="toggleLock(${i})">${h.locked?'Release':'Keep Hero'}</button>`;
         c.appendChild(d);
 
         // Wire tooltips via global JS system (immune to overflow:hidden)
         const raceData=GAME_DATA.races.find(r=>r.name===h.race);
         const clsData=GAME_DATA.classes.find(cl=>cl.name===h.job);
-        const genderName=h.gender===0?'Male':'Female';
-        const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
         const initMod=Math.floor((h.dex+h.lck)/4);
         const resHTML=Object.entries(h.resistances).filter(([,v])=>v!==0)
             .map(([k,v])=>`<span style="color:#ff7733">${k}: ${v>0?'+':''}${v}%</span>`).join('  ')||'None';
+
+        // Alignment tooltip
+        const dtAlign=DAMAGE_TYPES[h.damageType]?.alignment||'neutral';
+        const moralDmgBonus=dtAlign==='light'&&h.morality>0?Math.floor(h.morality/20):dtAlign==='dark'&&h.morality<0?Math.floor(-h.morality/20):0;
+        const alignTip=
+            `<span style="color:${mColor};font-size:1.05em">⚖ ${mLabel}  (${h.morality>0?'+':''}${h.morality})</span><br><br>`+
+            `<span style="color:#aaaaaa">Morality shapes how the world treats this hero.<br>It shifts through battle choices and deeds.</span><br><br>`+
+            `<span style="color:#e8c45a">Righteous</span> <span style="color:#aaaaaa">> +30 — favoured by light, reduced scenario harm</span><br>`+
+            `<span style="color:#6abf45">Good</span>       <span style="color:#aaaaaa">+11 to +30 — fate leans kindly</span><br>`+
+            `<span style="color:#aaaaaa">Neutral</span>    <span style="color:#aaaaaa">−10 to +10 — no blessing, no curse</span><br>`+
+            `<span style="color:#c8802a">Shadowed</span>  <span style="color:#aaaaaa">−11 to −30 — darker choices, darker fate</span><br>`+
+            `<span style="color:#cc3333">Corrupt</span>   <span style="color:#aaaaaa">< −30 — scenario harm amplified, dark power grows</span><br><br>`+
+            `<span style="color:#c8c0b0">Damage type:</span> <span style="color:#ff7733">${h.damageType}</span> `+
+            (dtAlign==='light'?`<span style="color:#aaaaaa">(light)</span> — `+(h.morality>0?`<span style="color:#6abf45">+${moralDmgBonus} bonus per hit from alignment</span>`:`<span style="color:#aaaaaa">morality too low for damage bonus</span>`):
+             dtAlign==='dark'?`<span style="color:#aaaaaa">(dark)</span> — `+(h.morality<0?`<span style="color:#b47afe">+${moralDmgBonus} bonus per hit from alignment</span>`:`<span style="color:#aaaaaa">morality too righteous for dark bonus</span>`):
+             `<span style="color:#aaaaaa">(neutral — unaffected by morality)</span>`)+`<br><br>`+
+            `<span style="color:#c8c0b0">How it changes:</span><br>`+
+            `<span style="color:#6abf45">+1</span> <span style="color:#aaaaaa">basic attack kill when abilities were available</span><br>`+
+            `<span style="color:#6abf45">+1</span> <span style="color:#aaaaaa">surviving a risky scenario choice</span><br>`+
+            `<span style="color:#cc3333">−1</span> <span style="color:#aaaaaa">killing blow with strong ability (≥2×) at full HP</span><br>`+
+            `<span style="color:#cc3333">−5</span> <span style="color:#aaaaaa">fleeing from combat</span>`;
+        const alignEl=d.querySelector(`[data-setup-align="${i}"]`);
+        if(alignEl) showTip(alignEl, alignTip);
 
         // Race tooltip
         const raceLoreText=raceData?.lore?`<br><br><em style="color:#aaaaaa;font-style:italic">${raceData.lore}</em>`:'';
@@ -769,21 +802,40 @@ function renderSetup(){
         const nameEl=d.querySelector(`[data-setup-name="${i}"]`);
         if(nameEl) showTip(nameEl, leaderTip);
 
-        // Stats tooltips
-        const stats1Tip=
-            `<span style="color:#6abf45">HP ${h.hp}</span> — total hit points before falling in combat<br>`+
-            `<span style="color:#88ccff">STR ${h.str}</span> — melee/physical damage (if primary stat)<br>`+
-            `<span style="color:#88ccff">INT ${h.int}</span> — spell/arcane damage (if primary stat)<br>`+
-            `<span style="color:#88ccff">DEX ${h.dex}</span> — affects initiative order and crit chance`;
-        const stats2Tip=
-            `<span style="color:#88ccff">CHA ${h.cha}</span> — party cohesion and scenario social checks<br>`+
-            `<span style="color:#88ccff">STA ${h.sta}</span> — stamina; affects resting and endurance<br>`+
-            `<span style="color:#88ccff">LCK ${h.lck}</span> — crit chance, item finds, and initiative<br>`+
-            `<br><span style="color:#aaaaaa">Initiative bonus: +${initMod} (from DEX+LCK)</span>`;
+        // Stats tooltip — covers the whole grid
+        const statsTip=
+            `<span style="color:#6abf45">HP ${h.hp}</span> — hit points before falling in combat<br>`+
+            `<span style="color:${h.primaryStat==='str'?'#88ccff':'#888888'}">STR ${h.str}</span> — melee / physical damage${h.primaryStat==='str'?' <span style="color:#e8c45a">★ primary</span>':''}<br>`+
+            `<span style="color:${h.primaryStat==='int'?'#88ccff':'#888888'}">INT ${h.int}</span> — spell / arcane damage${h.primaryStat==='int'?' <span style="color:#e8c45a">★ primary</span>':''}<br>`+
+            `<span style="color:${h.primaryStat==='dex'?'#88ccff':'#888888'}">DEX ${h.dex}</span> — initiative order and crit chance${h.primaryStat==='dex'?' <span style="color:#e8c45a">★ primary</span>':''}<br>`+
+            `<span style="color:#888888">CHA ${h.cha}</span> — cohesion and scenario social checks<br>`+
+            `<span style="color:#888888">STA ${h.sta}</span> — stamina; affects resting and endurance<br>`+
+            `<span style="color:#888888">LCK ${h.lck}</span> — crit chance, item finds, and initiative<br>`+
+            `<br><span style="color:#aaaaaa">Initiative bonus: <span style="color:#88ccff">+${initMod}</span> (DEX+LCK÷4)<br>`+
+            `Hover over Race or Class for detailed lore.</span>`;
         const stats1El=d.querySelector(`[data-setup-stats1="${i}"]`);
-        const stats2El=d.querySelector(`[data-setup-stats2="${i}"]`);
-        if(stats1El) showTip(stats1El, stats1Tip);
-        if(stats2El) showTip(stats2El, stats2Tip);
+        if(stats1El) showTip(stats1El, statsTip);
+        // Resistance tooltip
+        if(hasRes){
+            const resEl=d.querySelector(`[data-setup-res="${i}"]`);
+            if(resEl){
+                const resTipLines=Object.entries(h.resistances).filter(([,v])=>v!==0)
+                    .map(([k,v])=>`<span style="color:${v>0?'#6abf45':'#cc3333'}">${v>0?'+':''}${v}%</span> vs <span style="color:#ff7733">${k}</span>`)
+                    .join('<br>');
+                showTip(resEl,`<span style="color:#ff7733">🛡 Resistances</span><br><br>${resTipLines}<br><br><span style="color:#aaaaaa">Positive: take less damage of that type<br>Negative: take more damage of that type</span>`);
+            }
+        }
+
+        // Crown tooltip — only the leader has it
+        if(h.isLeader){
+            const crownEl=d.querySelector(`[data-setup-crown="${i}"]`);
+            if(crownEl) showTip(crownEl,
+                `<span style="color:#e8c45a;font-size:1.05em">👑 The Mantle of Command</span><br><br>`+
+                `<span style="color:#c8c0b0">This soul presently bears the fellowship's burden of leadership — drawn by the Old Reckoning to the one whose instincts run sharpest and whose fortune burns brightest.</span><br><br>`+
+                `<span style="color:#aaaaaa">It is no crown of blood or birthright. Should another prove swifter of foot and luckier of hand as the battle turns, the Mantle shall pass — without ceremony, without grief — to more worthy shoulders.</span><br><br>`+
+                `<span style="color:#88ccff">Determined by: DEX + LCK</span><br>`+
+                `<span style="color:#88ccff">+2 initiative in battle · may attempt to flee</span>`);
+        }
 
         // Basic attack tooltip
         const atkEl=d.querySelector(`[data-setup-atk="${i}"]`);
@@ -872,8 +924,6 @@ function buildCard(spr,data){
     const statusHTML=statusIcons.map(s=>`<span class="status-icon" data-tip="${s.tip.replace(/"/g,'&quot;')}">${s.icon}</span>`).join('');
     const itemHTML=(items||[]).slice(-4).map(n=>{
         const ic=itemIcon(n);
-        const it=GAME_DATA.items.find(x=>x.name===n);
-        const tip=it?`<span style="color:var(--gold)">✦ ${n}</span><br>+${it.val} <span style="color:#88ccff">${it.stat.toUpperCase()}</span>`:n;
         return `<span class="pi-item-icon" data-itemname="${n.replace(/"/g,'&quot;')}">${ic}</span>`;
     }).join('');
     const nameCls=isMonster?'pi-name pi-name-monster':'pi-name';
@@ -957,7 +1007,6 @@ function renderPortraitStrip(){
         order.forEach(({h,i})=>{
             const card=document.getElementById(`portrait-card-${i}`);
             if(!card)return;
-            const dead=h.hp<=0;
             const initMod=Math.floor((h.dex+h.lck)/4);
             const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
             const moralCol=h.morality>30?'#e8c45a':h.morality>10?'#6abf45':h.morality>-10?'#aaaaaa':h.morality>-30?'#c8802a':'#cc3333';
