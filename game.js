@@ -455,7 +455,7 @@ let party=[null,null,null],turn=0,teamName='',treasury={gold:0,gems:0};
 
 /* ── Battle state — reset at start of each combat ── */
 const battle={
-    monster:null,order:[],turnIdx:0,round:1,active:false,charmUsed:false,
+    monster:null,monsters:[],targetIdx:0,isPack:false,order:[],turnIdx:0,round:1,active:false,charmUsed:false,
     monsterAtkMult:1.0,monsterAtkMultRounds:0,
     heroDmgMult:{},         // {heroIdx: {mult, rounds}}
     monsterSkipTurns:0,
@@ -486,10 +486,10 @@ const ABILITY_EFFECTS={
 
     /* ── Warriors ── */
     shield_wall:(h,hi)=>{battle.heroShielded[hi]=(battle.heroShielded[hi]||0)+1;log(`${h.name} raises their shield — the next blow will be absorbed.`);SFX.shield();finishAbilityTurn();},
-    rallying_cry:(h)=>{const heal=Math.floor(0.12*h.maxHp);party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+heal,x.maxHp);});log(`${h.name} sounds a Rallying Cry! All allies recover ${heal} HP.`);SFX.ability();finishAbilityTurn();},
+    rallying_cry:(h)=>{const heal=Math.floor(0.12*h.maxHp);party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+heal,x.maxHp);});const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} sounds a Rallying Cry! All allies recover ${heal} HP. (${h.name} spends ${cost} HP in the effort)`);SFX.ability();finishAbilityTurn();},
     rage:(h,hi)=>{battle.heroRage[hi]=3;log(`${h.name} enters a RAGE! +70% damage for 3 rounds.`);SFX.ability();finishAbilityTurn();},
     reckless_atk:(h,hi)=>{log(`${h.name} swings a Reckless Attack — 2× power!`);executeAttack(h,hi,2.0);},
-    second_wind:(h)=>{const heal=Math.floor(0.20*h.maxHp);h.hp=Math.min(h.hp+heal,h.maxHp);log(`${h.name} finds a Second Wind! +${heal} HP.`);SFX.heal();finishAbilityTurn();},
+    second_wind:(h)=>{const heal=Math.floor(0.20*h.maxHp);h.hp=Math.min(h.hp+heal,h.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} finds a Second Wind! +${heal} HP. (Morality −1 — self-preservation over the mission)`);SFX.heal();finishAbilityTurn();},
     action_surge:(h,hi)=>{
         log(`${h.name} surges — attacking twice!`);SFX.ability();
         resolveHeroHit(h,hi,pick(h.attackNames),1.0);
@@ -504,20 +504,20 @@ const ABILITY_EFFECTS={
     /* ── Holy ── */
     lay_on_hands:(h)=>{const w=party.filter(x=>x.hp>0&&x.hp/x.maxHp<=0.30);const t=w.length?w[0]:h;const a=w.length?t.maxHp:Math.floor(0.40*h.maxHp);t.hp=Math.min(t.hp+a,t.maxHp);log(`${h.name} lays hands on ${t.name}! +${a} HP.`);SFX.heal();finishAbilityTurn();},
     divine_smite:(h,hi)=>{const isEvil=DAMAGE_TYPES[battle.monster.damageType]?.alignment==='dark'||battle.monster.undead;const mult=isEvil?2.5:2.0;log(`${h.name} calls Divine Smite!${isEvil?' Extra judgement against this evil foe!':''}`);executeAttack(h,hi,mult,false,'holy');},
-    divine_heal:(h)=>{const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const a=Math.floor(0.35*t.maxHp);t.hp=Math.min(t.hp+a,t.maxHp);log(`${h.name} channels Divine Heal to ${t.name}! +${a} HP.`);SFX.heal();finishAbilityTurn();},
+    divine_heal:(h)=>{const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const a=Math.floor(0.35*t.maxHp);t.hp=Math.min(t.hp+a,t.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} channels Divine Heal to ${t.name}! +${a} HP. (Morality −1 — cannot save everyone)`);SFX.heal();finishAbilityTurn();},
     turn_undead:(h,hi)=>{const isU=!!battle.monster.undead;if(!isU){battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);log(`${h.name} invokes Turn Undead — the creature is stunned!`);}else{log(`${h.name} invokes Turn Undead! Holy power blazes against the undead!`);}executeAttack(h,hi,isU?3.0:1.0,false,'holy');},
-    holy_aegis:(h)=>{party.forEach((_,i)=>{battle.heroShielded[i]=(battle.heroShielded[i]||0)+1;});log(`${h.name} raises Holy Aegis — whole party shielded!`);SFX.shield();finishAbilityTurn();},
+    holy_aegis:(h)=>{party.forEach((_,i)=>{battle.heroShielded[i]=(battle.heroShielded[i]||0)+1;});const cost=Math.min(8,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} raises Holy Aegis — whole party shielded! (${h.name} spends ${cost} HP in divine exertion)`);SFX.shield();finishAbilityTurn();},
     judgment:(h,hi)=>{battle.judgmentPrimed[hi]=true;log(`${h.name} marks ${battle.monster.name} with Judgment!`);SFX.ability();finishAbilityTurn();},
-    spirit_totem:(h)=>{battle.spiritTotemRounds=2;log(`${h.name} summons a Spirit Totem! Party heals 10 HP/round for 2 rounds.`);SFX.ability();finishAbilityTurn();},
+    spirit_totem:(h)=>{battle.spiritTotemRounds=2;const cost=Math.min(8,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} summons a Spirit Totem! Party heals 10 HP/round for 2 rounds. (${h.name} spends ${cost} HP binding the spirit)`);SFX.ability();finishAbilityTurn();},
     thunder_axe:(h,hi)=>{log(`${h.name} calls Thunder Axe — 2.5× lightning!`);executeAttack(h,hi,2.5,false,'lightning');},
 
     /* ── Rogues ── */
-    backstab:(h,hi)=>{if(!battle.monsterAttackedLastRound){log(`${h.name} cannot Backstab — the monster has not yet attacked.`);SFX.neutral();finishAbilityTurn();return;}log(`${h.name} drives a Backstab — 2.5× damage!`);executeAttack(h,hi,2.5);},
+    backstab:(h,hi)=>{if(!battle.monsterAttackedLastRound){log(`${h.name} cannot find an opening for Backstab — improvises a quick jab (0.7×)!`);SFX.strike();executeAttack(h,hi,0.70);return;}log(`${h.name} drives a Backstab — 2.5× damage!`);executeAttack(h,hi,2.5);},
     vanish:(h)=>{log(`${h.name} vanishes into shadow — the fellowship retreats!`);SFX.flee();battle.active=false;setTimeout(nextTurn,500);},
-    hunters_mark:(h,hi)=>{battle.heroDmgMult[hi]={mult:1.6,rounds:3};log(`${h.name} applies Hunter's Mark — +60% damage for 3 attacks.`);SFX.ability();finishAbilityTurn();},
-    distracting_shot:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);log(`${h.name} fires a Distracting Shot — monster loses next action!`);SFX.ability();finishAbilityTurn();},
+    hunters_mark:(h,hi)=>{battle.heroDmgMult[hi]={mult:1.6,rounds:3};h.morality=clamp(h.morality-1,-100,100);log(`${h.name} applies Hunter's Mark — +60% damage for 3 attacks. (Morality −1 — a death-mark is a dark rite)`);SFX.ability();finishAbilityTurn();},
+    distracting_shot:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);const cost=Math.min(3,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} fires a Distracting Shot — monster loses next action! (${h.name} exposes herself for ${cost} HP)`);SFX.ability();finishAbilityTurn();},
     poison_blade:(h)=>{battle.dotEffects.push({dmgPerRound:18,dmgType:'poison',rounds:3,source:h.name});log(`${h.name} applies deep Poison — 18 poison damage/round for 3 rounds.`);SFX.ability();finishAbilityTurn();},
-    smoke_bomb:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);log(`${h.name} hurls a Smoke Bomb — monster blinded, next attack misses!`);SFX.ability();finishAbilityTurn();},
+    smoke_bomb:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);const cost=Math.min(3,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} hurls a Smoke Bomb — monster blinded, next attack misses! (${h.name} inhales fumes for ${cost} HP)`);SFX.ability();finishAbilityTurn();},
     shadow_step:(h,hi)=>{battle.heroShielded[hi]=(battle.heroShielded[hi]||0)+1;log(`${h.name} Shadow Steps — dodging next attack and striking at 1.5×!`);executeAttack(h,hi,1.5);},
     eclipse:(h)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.60);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,2);log(`${h.name} casts Eclipse — monster attack −40% for 2 rounds.`);SFX.ability();finishAbilityTurn();},
     arcane_pierce:(h,hi)=>{
@@ -541,7 +541,7 @@ const ABILITY_EFFECTS={
     },
 
     /* ── Mages ── */
-    frost_nova:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,2);log(`${h.name} casts Frost Nova — monster FROZEN for 2 turns!`);SFX.ability();finishAbilityTurn();},
+    frost_nova:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,2);const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} casts Frost Nova — monster FROZEN for 2 turns! (${h.name} spends ${cost} HP in concentration)`);SFX.ability();finishAbilityTurn();},
     arcane_surge:(h,hi)=>{const rc=Math.floor(0.20*h.maxHp);h.hp=Math.max(1,h.hp-rc);log(`${h.name} channels Arcane Surge (${rc} recoil) — 3× power!`);executeAttack(h,hi,3.0);},
     chain_lightning:(h,hi)=>{log(`${h.name} releases Chain Lightning — 2.5×!`);executeAttack(h,hi,2.5,false,'lightning');},
     wild_magic:(h,hi)=>{
@@ -551,14 +551,14 @@ const ABILITY_EFFECTS={
         if(eff==='freeze'){battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,2);log('Monster frozen for 2 turns!');finishAbilityTurn();return;}
         if(eff==='heal'){party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+25,x.maxHp);});log('The surge heals all allies for 25 HP!');SFX.heal();finishAbilityTurn();return;}
         if(eff==='loot'){giveLoot();log('The surge summons a relic from the ether!');finishAbilityTurn();return;}
-        if(eff==='recoil'){const d=rand(20,40);h.hp=Math.max(1,h.hp-d);log(`The surge backfires — ${h.name} takes ${d} damage!`);SFX.bad();shake();finishAbilityTurn();return;}
+        if(eff==='recoil'){const d=rand(20,40);h.hp=Math.max(1,h.hp-d);h.morality=clamp(h.morality+1,-100,100);log(`The surge backfires — ${h.name} takes ${d} damage! (Morality +1 — enduring chaos with dignity)`);SFX.bad();shake();finishAbilityTurn();return;}
     },
     undead_barrier:(h,hi)=>{battle.heroShielded[hi]=(battle.heroShielded[hi]||0)+1;log(`${h.name} raises an Undead Barrier — next hit absorbed.`);SFX.shield();finishAbilityTurn();},
-    wither:(h,hi)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.70);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,2);log(`${h.name} casts Wither — monster −30% attack + 1.5× necrotic hit!`);executeAttack(h,hi,1.5,false,'necrotic');},
+    wither:(h,hi)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.70);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,2);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} casts Wither — monster −30% attack + 1.5× necrotic hit! (Morality −1 — necrotic arts exact their toll)`);executeAttack(h,hi,1.5,false,'necrotic');},
     combustion:(h,hi)=>{battle.combustPrimed[hi]=true;log(`${h.name} primes Combustion — next Fireball deals 3×!`);SFX.ability();finishAbilityTurn();},
     inferno_dot:(h)=>{battle.dotEffects.push({dmgPerRound:20,dmgType:'fire',rounds:3,source:h.name});log(`${h.name} sets ${battle.monster.name} ablaze — 20 fire damage/round for 3 rounds.`);SFX.ability();finishAbilityTurn();},
-    reality_tear:(h)=>{battle.monsterResistNullified=true;log(`${h.name} tears Reality — monster defences nullified for this battle!`);SFX.ability();finishAbilityTurn();},
-    phase_shift:(h,hi)=>{battle.heroPhaseShift[hi]=2;log(`${h.name} Phase Shifts into the void — untargetable for 2 rounds.`);SFX.ability();finishAbilityTurn();},
+    reality_tear:(h)=>{battle.monsterResistNullified=true;const cost=Math.min(8,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} tears Reality — monster defences nullified for this battle! (${h.name} bleeds ${cost} HP from the strain)`);SFX.ability();finishAbilityTurn();},
+    phase_shift:(h,hi)=>{battle.heroPhaseShift[hi]=2;const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} Phase Shifts into the void — untargetable for 2 rounds. (${h.name} spends ${cost} HP bleeding between worlds)`);SFX.ability();finishAbilityTurn();},
 
     /* ── Hybrids ── */
     hex:(h)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.80);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,3);log(`${h.name} places a Hex — monster −20% attack for 3 rounds.`);SFX.ability();finishAbilityTurn();},
@@ -586,7 +586,7 @@ const ABILITY_EFFECTS={
             delay+=280;
         }
     },
-    ki_block:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);log(`${h.name} channels Ki Block — monster next attack cancelled.`);SFX.ability();finishAbilityTurn();},
+    ki_block:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);const cost=Math.min(3,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} channels Ki Block — monster next attack cancelled. (${h.name} spends ${cost} HP burning ki)`);SFX.ability();finishAbilityTurn();},
     /* FIX: life_drain uses resolveHeroHit directly, then handles advance itself
        (previously called executeAttackReturn + finishAbilityTurn = double-advance) */
     life_drain:(h,hi)=>{
@@ -599,8 +599,8 @@ const ABILITY_EFFECTS={
     },
     blood_surge:(h,hi)=>{const s=Math.floor(0.25*h.maxHp);h.hp=Math.max(1,h.hp-s);log(`${h.name} surges with Blood (sacrifice ${s} HP) — 2.5×!`);executeAttack(h,hi,2.5);},
     natures_grasp:(h)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.65);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,2);log(`${h.name} uses Nature's Grasp — monster −35% attack for 2 rounds.`);SFX.ability();finishAbilityTurn();},
-    barkskin:(h)=>{party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+20,x.maxHp+20);x.maxHp+=20;});log(`${h.name} hardens Barkskin — everyone gains +20 temporary HP.`);SFX.ability();finishAbilityTurn();},
-    entangle:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,2);log(`${h.name} casts Entangle — monster rooted for 2 turns!`);SFX.ability();finishAbilityTurn();},
+    barkskin:(h)=>{party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+20,x.maxHp+20);x.maxHp+=20;});h.morality=clamp(h.morality-1,-100,100);log(`${h.name} hardens Barkskin — everyone gains +20 temporary HP. (Morality −1 — twisting nature is not without cost)`);SFX.ability();finishAbilityTurn();},
+    entangle:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,2);const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} casts Entangle — monster rooted for 2 turns! (${h.name} bleeds ${cost} HP binding the roots)`);SFX.ability();finishAbilityTurn();},
     regrowth:(h)=>{const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const ti=party.indexOf(t);battle.heroRegen[ti]={amount:Math.floor(0.08*t.maxHp),rounds:3};log(`${h.name} applies Regrowth to ${t.name} — regenerates ${battle.heroRegen[ti].amount} HP/round for 3 rounds.`);SFX.ability();finishAbilityTurn();},
 };
 
@@ -1133,9 +1133,18 @@ function doScenario(){
     const typeIcon={'good':tc('good','✦ Favourable'),'bad':tc('warn','⚠ Risky'),'neutral':tc('lore','~ Uncertain')};
     const choices=ev.options.map((opt,i)=>{
         const icon=typeIcon[opt.type||'neutral']||typeIcon.neutral;
+        const isRisky=!!opt.damage;
+        const isUncertain=!opt.damage&&!opt.bonus&&!opt.item;
         const tip=`${icon}<br><br>${tc('lore',opt.effect||opt.text)}`+
-            (opt.damage?`<br>${tc('warn','May cause '+opt.damage+' damage')}`:'')+ 
-            (opt.bonus?`<br>${tc('good','Grants a bonus')}`:'')+ 
+            (isRisky?`<br>${tc('warn','May cause '+opt.damage+' damage')}`:'')+
+            (isRisky?`<br><br>${tc('good','✦ Bold reward — risk is never without return:')}<br>`+
+                `${tc('good','· +50% bonus XP for choosing the harder path')}<br>`+
+                `${tc('good','· Random bonus: item find (30%) · +1 stat (25%)')}<br>`+
+                `${tc('good','· HP recovery 10% maxHP (20%) · Morality +1 (25%)')}`:'')+
+            (isUncertain?`<br><br>${tc('lore','~ Uncertain paths are not empty:')}<br>`+
+                `${tc('lore','· 35% chance of a hidden reward')}<br>`+
+                `${tc('lore','· Possible: item find · +1 stat · gold coins')}`:'')+
+            (opt.bonus?`<br>${tc('good','Grants a bonus')}`:'')+
             (opt.item?`<br>${tc('item','May yield an item')}`:'');
         return {label:`[${i+1}] ${opt.text}`,tooltip:tip,action:()=>resolveScenario(opt)};
     });
@@ -1156,6 +1165,15 @@ function resolveScenario(opt){
         if(moralMod>0)log(`${mLabel} bearing softens the blow. (−${moralMod} damage)`);
         else if(moralMod<0)log(`${mLabel} draws darker fate. (+${-moralMod} damage)`);
         SFX.bad();shake();
+        // Bold reward — the risky path always carries potential
+        const boldXpBonus=Math.floor((opt.xp??15)*0.50);
+        const boldRoll=Math.random();
+        if(boldRoll<0.30){giveLoot();log(`Fortune favours the bold — ${h.name} finds something useful amid the chaos!`);SFX.loot();}
+        else if(boldRoll<0.55){const s=pick(['str','int','dex','cha','sta','lck']);h[s]+=1;log(`Adversity sharpens the mind. ${h.name} gains +1 ${s.toUpperCase()} from the ordeal.`);SFX.good();}
+        else if(boldRoll<0.75){const hpR=Math.floor(h.maxHp*0.10);h.hp=Math.min(h.hp+hpR,h.maxHp);log(`${h.name} rallies after the ordeal, recovering ${hpR} HP.`);SFX.heal();}
+        else{h.morality=clamp(h.morality+1,-100,100);log(`${h.name} faces the hardship with dignity. (Morality +1)`);SFX.good();}
+        log(`Bold path rewarded: +${boldXpBonus} bonus XP.`);
+        grantXP(h,boldXpBonus);
     }
     if(opt.bonus?.hp)h.hp=Math.min(h.hp+(opt.bonus.hp||0),h.maxHp);
     if(opt.bonus?.str)h.str+=opt.bonus.str;if(opt.bonus?.int)h.int+=opt.bonus.int;
@@ -1163,7 +1181,16 @@ function resolveScenario(opt){
     if(opt.bonus?.sta)h.sta+=opt.bonus.sta;if(opt.bonus?.lck)h.lck+=opt.bonus.lck;
     if(opt.bonus&&!opt.damage)SFX.good();
     if(opt.item)giveLoot();
-    if(!opt.damage&&!opt.bonus&&!opt.item)SFX.neutral();
+    if(!opt.damage&&!opt.bonus&&!opt.item){
+        SFX.neutral();
+        // Uncertain paths are not empty — 35% chance of a hidden reward
+        if(Math.random()<0.35){
+            const uRoll=Math.random();
+            if(uRoll<0.45){giveLoot();log(`The uncertain path yields an unexpected find!`);SFX.loot();}
+            else if(uRoll<0.80){const s=pick(['str','int','dex','cha','sta','lck']);h[s]+=1;log(`The uncertain path hones ${h.name}. +1 ${s.toUpperCase()}.`);SFX.good();}
+            else{const g=rand(10,30);treasury.gold+=g;log(`The uncertain path leads past forgotten coin. +${g} gold.`);SFX.treasury();}
+        }
+    }
     if(opt.morality)h.morality=clamp(h.morality+opt.morality,-100,100);
     log(`${h.name}: ${opt.effect}`);grantXP(h,opt.xp??15);setTimeout(nextTurn,40);
 }
@@ -1351,7 +1378,8 @@ function showHeroAction(hero){
         `Crit chance: ${tc('good',critP+'%')}<br>`+
         `Initiative cost: ${tc('good',basicCost)} · Recovery on hit: ${tc('good','+2')} · Net: ${tc('good','+1 per round')}<br>`+
         `Current initiative: ${tc('stat',curInit)}<br><br>`+
-        `${tc('good','✦ Choosing basic attack when stronger skills are available')} earns +1 Morality on a killing blow.`;
+        `${tc('good','✦ Choosing basic attack when stronger skills are available')} earns +1 Morality on a killing blow.<br>`+
+        `${tc('lore','The weak path is its own kind of courage.')}`;
     choices.push({label:`[1] ${atkName}`,tooltip:atkTip,action:()=>{
         if(oe)oe.initiative=Math.max(1,oe.initiative-basicCost);
         executeAttackWithMorality(hero,hi,1.0,true);
@@ -1365,12 +1393,24 @@ function showHeroAction(hero){
         const costCol=abCost<=2?'good':abCost<=4?'warn':'blood';
         const netCol=netInit>=0?'good':netInit>=-2?'warn':'blood';
         let tipColor=ready?'item':'warn';
+        // Detect risk/cost category for contextual hint
+        const isHighCost=abCost>=4;
+        const isSacrificeSelf=(['arcane_surge','pact_of_blood','blood_surge','reckless_atk'].includes(ab.id));
+        const isControlAbility=(['frost_nova','entangle','distracting_shot','smoke_bomb','ki_block','reality_tear','phase_shift','holy_aegis'].includes(ab.id));
+        const riskHint=isSacrificeSelf
+            ?`<br><br>${tc('warn','⚠ Costs own HP — but killing blow at low HP earns +1 Morality (sacrifice accepted)')}`
+            :isControlAbility
+            ?`<br><br>${tc('warn','⚠ Costs own HP to execute — control without cost is no choice at all')}`
+            :isHighCost
+            ?`<br><br>${tc('lore','Heavy ability — killing blow with mult ≥2× when at full HP costs Morality −1 (should have known better)')}`
+            :'';
         const abTip=`${tc(tipColor,ab.name)}<br>`+
             `${tc('skill',ab.desc)}<br><br>`+
             (ready?`${tc('good','✓ Ready')}`:`${tc('warn','⏳ Cooldown: '+cd+' round(s) remaining')}`)+
             `<br>Cooldown: ${ab.cooldown} rounds after use<br>`+
             `Initiative cost: ${tc(costCol,abCost+' ('+costLabel+')')} · Recovery on hit: ${tc('good','+2')} · Net: ${tc(netCol,(netInit>=0?'+':'')+netInit)}<br>`+
             `Current initiative: ${tc('stat',curInit)}`+
+            riskHint+
             (battle.monster.name&&mData?`<br><br>${tc('lore',mData.name)}${mLore}`:'');
         choices.push({
             label:`[${choices.length+1}] ${ab.name}`+(ready?'':'  ('+cd+' rnd)')+`  — ${ab.desc}`,
@@ -1395,6 +1435,30 @@ function showHeroAction(hero){
             `Only the party leader may attempt this.`;
         choices.push({label:`[${choices.length+1}] Attempt to flee (leader only)`,isFlee:true,tooltip:fleeTip,action:()=>attemptFlee(hero)});
     }
+    if(battle.isPack){
+        const dRetTip=`${tc('warn','⚠ Guaranteed escape — but at great cost')}<br><br>`+
+            `${tc('blood','All heroes reduced to 10% HP')}<br>`+
+            `${tc('blood','All heroes\' initiative set to 1')}<br><br>`+
+            `${tc('lore','Facing a pack is folly. Fleeing is wisdom — costly wisdom.')}`;
+        choices.push({label:`[${choices.length+1}] Desperate Retreat (100% success — costs 90% HP)`,isFlee:true,tooltip:dRetTip,action:()=>desperateRetreat(hero)});
+    }
+    // Resurrection option — available to any hero when conditions are met
+    const deadHeroesForRes=party.filter(h=>h.hp<=0);
+    const aliveHeroesForRes=party.filter(h=>h.hp>0);
+    if(deadHeroesForRes.length>0&&aliveHeroesForRes.length>=2){
+        const totalInit=aliveHeroesForRes.reduce((sum,h)=>{const oe=battle.order.find(e=>e.type==='hero'&&e.entity===h);return sum+(oe?oe.initiative:(h.lastInitiative||0));},0);
+        if(totalInit>=5){
+            const rTarget=deadHeroesForRes[0];
+            const resTip=`${tc('good','✦ Resurrect '+rTarget.name)}<br><br>`+
+                `${tc('skill','Channels the collective life force of the fellowship to restore the fallen.')}<br><br>`+
+                `${tc('warn','⚠ Requires: ≥5 total initiative in team')}<br>`+
+                `${tc('warn','⚠ Requires: ≥2 heroes alive')}<br>`+
+                `${tc('blood','Cost: all heroes\' initiative set to 1')}<br>`+
+                `${tc('good','Effect: '+rTarget.name+' revived with 1 HP')}<br><br>`+
+                `${tc('lore','Total team initiative: '+totalInit)}`;
+            choices.push({label:`[${choices.length+1}] ✦ Resurrection — revive ${rTarget.name} (drains all initiative)`,tooltip:resTip,action:()=>performResurrection(rTarget)});
+        }
+    }
     setChoices(choices);
 }
 
@@ -1418,7 +1482,10 @@ function executeAttackWithMorality(hero,hi,mult,isBasic=false){
    ───────────────────────────────────────────── */
 function executeAttack(hero,hi,mult,_guaranteeHit=false,overrideDmgType=null){
     resolveHeroHit(hero,hi,pick(hero.attackNames),mult,overrideDmgType);
-    if(handleMonsterDeath()){endCombat(true);return;}
+    if(handleMonsterDeath()){
+        if(mult>=2.0&&hero.hp/hero.maxHp>=0.90){hero.morality=clamp(hero.morality-1,-100,100);log(`${hero.name} — great power spent when restraint would have served. (Morality −1)`);}
+        endCombat(true);return;
+    }
     advanceBattleTurn();
     renderStats();
     setTimeout(processBattleTurn,300);
@@ -1480,6 +1547,26 @@ function attemptFlee(hero){
     else{log(`The ${battle.monster.name} cuts off the retreat!`,'blood');SFX.bad();advanceBattleTurn();setTimeout(processBattleTurn,400);}
 }
 
+function performResurrection(deadHero){
+    deadHero.hp=1;
+    const alive=party.filter(h=>h.hp>0);
+    alive.forEach(h=>{const oe=battle.order.find(e=>e.type==='hero'&&e.entity===h);if(oe)oe.initiative=1;});
+    log(`✦ The fellowship channels a desperate Resurrection! ${deadHero.name} stirs from death — restored to 1 HP!`);
+    log(`The tremendous effort drains the party to their last reserves — all heroes' initiative set to 1.`);
+    SFX.spellHoly();
+    finishAbilityTurn();
+}
+function desperateRetreat(hero){
+    log(`${hero.name} calls a desperate retreat! The fellowship flees headlong, paying with blood and exhaustion.`);
+    SFX.flee();
+    party.filter(h=>h.hp>0).forEach(h=>{
+        h.hp=Math.max(1,Math.floor(h.maxHp*0.10));
+        const oe=battle.order.find(e=>e.type==='hero'&&e.entity===h);
+        if(oe)oe.initiative=1;
+    });
+    log(`All heroes reduced to 10% HP and initiative drained to 1.`);
+    battle.active=false;setMusicMood('normal');setTimeout(nextTurn,500);
+}
 function endCombat(won){
     if(!battle.active)return;   // guard against double-calls
     battle.active=false;

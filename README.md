@@ -1,5 +1,7 @@
 Norrtounia - The Dark Forest
 Javascript Dungeon Crawler with random encounters.
+v1.6 - Added resurrection and reworked the actions possible to more clearly state the risks and benefits. Very few actions should come without a cost or benefit.
+
 v1.5 - Added a 10% chance to encounter more than one monster at a time, and the capability to select targeted monster.
 
 v1.3 - Several fixes to tool tips, added a mute button ingame for music, a high score button, also overhauled the alignment and moral system of the game.
