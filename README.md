@@ -1,5 +1,8 @@
 Norrtounia - The Dark Forest
 Javascript Dungeon Crawler with random encounters.
+
+v2.0 - Bug fixes, reworked dext and luck stats. Gave conflicting moralities a bonus, changed morality aspects of several actions.
+
 v1.8 - Dice rolls added. Finally. Corrected some display bugs as well. Added tool tip for certain monster types like undead.
 
 v1.7 - Reworked some visuals. The Character selection box is now clearer. Added missing tool tips. Fixed a few bugs. 

@@ -471,9 +471,10 @@ const battle={
     spiritTotemRounds:0,
     inspiredHero:null,      // heroIdx
     currentRoll:null,       // {roll,label,color,mult} — d20 result for current action
+    alignmentBonus:null,    // {roll,aligned,abilityAlign} — alignment bonus for current action
 };
 
-function resetBattle(){Object.assign(battle,{monster:null,monsters:[],targetIdx:0,isPack:false,order:[],turnIdx:0,round:1,active:false,charmUsed:false,monsterAtkMult:1.0,monsterAtkMultRounds:0,heroDmgMult:{},monsterSkipTurns:0,heroShielded:{},heroPhaseShift:{},heroRegen:{},heroRage:{},combustPrimed:{},judgmentPrimed:{},dotEffects:[],monsterResistNullified:false,monsterAttackedLastRound:false,spiritTotemRounds:0,inspiredHero:null,currentRoll:null});}
+function resetBattle(){Object.assign(battle,{monster:null,monsters:[],targetIdx:0,isPack:false,order:[],turnIdx:0,round:1,active:false,charmUsed:false,monsterAtkMult:1.0,monsterAtkMultRounds:0,heroDmgMult:{},monsterSkipTurns:0,heroShielded:{},heroPhaseShift:{},heroRegen:{},heroRage:{},combustPrimed:{},judgmentPrimed:{},dotEffects:[],monsterResistNullified:false,monsterAttackedLastRound:false,spiritTotemRounds:0,inspiredHero:null,currentRoll:null,alignmentBonus:null});}
 
 /* ═══════════════════════════════════════════════════════════════
    D20 DICE SYSTEM
@@ -482,8 +483,7 @@ function resetBattle(){Object.assign(battle,{monster:null,monsters:[],targetIdx:
    withDiceRoll(heroIdx, fn) — shows animation, then fires fn()
    showDiceRoll(heroIdx, result, cb) — portrait overlay animation
    ═══════════════════════════════════════════════════════════════ */
-function rollD20(){
-    const r=Math.floor(Math.random()*20)+1;
+function tierD20(r){
     if(r===1) return{roll:r,label:'Fumble!',  color:'#cc2222',mult:0.25};
     if(r<=5)  return{roll:r,label:'Poor',     color:'#c87830',mult:0.50};
     if(r<=10) return{roll:r,label:'Partial',  color:'#c8c030',mult:0.75};
@@ -491,6 +491,9 @@ function rollD20(){
     if(r<=19) return{roll:r,label:'Strong!',  color:'#6abf45',mult:1.30};
     return           {roll:r,label:'CRITICAL!',color:'#c9a227',mult:2.00};
 }
+function getLuckBonus(hero){return Math.round((hero.lck-10)/5);}
+function rollWithLuck(hero){const raw=Math.floor(Math.random()*20)+1;return tierD20(clamp(raw+getLuckBonus(hero),1,20));}
+function rollD20(){return tierD20(Math.floor(Math.random()*20)+1);}
 function getDiceMult(){return battle.currentRoll?battle.currentRoll.mult:1.0;}
 
 function showDiceRollOnCard(cardId,result,cb){
@@ -512,18 +515,105 @@ function showDiceRollOnCard(cardId,result,cb){
     setTimeout(()=>{ov.remove();cb();},2200);
 }
 
-function withDiceRoll(heroIdx,actionFn){
-    const result=rollD20();
+function withDiceRoll(heroIdx,actionFn,abilityId=null){
+    const result=rollWithLuck(party[heroIdx]);
     battle.currentRoll=result;
-    clearChoices();
+    battle.alignmentBonus=null;
     const hero=party[heroIdx];
     logHTML(`${hero?hero.name:'Hero'} raises the die — 🎲 `+
         `<span style="color:${result.color};font-weight:bold">${result.roll}</span> `+
         `<span style="color:${result.color}">${result.label}</span>`);
-    showDiceRollOnCard(`portrait-card-${heroIdx}`,result,actionFn);
+    showDiceRollOnCard(`portrait-card-${heroIdx}`,result,()=>{
+        // Resolve alignment effect before action fires
+        if(abilityId&&hero){
+            const as=computeHeroAlignState(hero,abilityId);
+            if(as){
+                if(as.aligned===true){
+                    battle.alignmentBonus=as; // picked up by resolveHeroHit / heals
+                    const msg=as.abilityAlign==='good'
+                        ?`${hero.name}'s righteous heart empowers the deed! (<span style="color:#e8c45a">+${as.roll} aligned power</span>)`
+                        :`${hero.name}'s dark nature feeds the deed! (<span style="color:#cc3333">+${as.roll} aligned power</span>)`;
+                    logHTML(msg);
+                } else if(as.aligned===false){
+                    const shift=as.abilityAlign==='evil'?-as.roll:as.roll;
+                    changeMorality(hero,shift);
+                    const msg=as.abilityAlign==='evil'
+                        ?`${hero.name} acts against their nature — this dark deed leaves a mark. (<span style="color:#cc3333">Morality −${as.roll}</span>)`
+                        :`${hero.name} acts against their nature — mercy feels foreign here. (<span style="color:#e8c45a">Morality +${as.roll}</span>)`;
+                    logHTML(msg);
+                } else {
+                    // Neutral hero: tiny nudge, no log clutter
+                    const nudge=as.abilityAlign==='good'?1:-1;
+                    changeMorality(hero,nudge);
+                }
+            }
+        }
+        actionFn();
+    });
 }
 
 const DICE_TIP=`<br><br><span style="color:#888888">🎲 Roll: 1=Fumble×¼ · 2–5=Poor×½ · 6–10=Partial×¾ · 11–15=Hit×1 · 16–19=Strong×1.3 · 20=Crit×2</span>`;
+
+/* ═══════════════════════════════════════════════════════════════
+   ABILITY ALIGNMENT — good / evil tags on specific abilities
+   Neutral abilities have no entry.
+   ═══════════════════════════════════════════════════════════════ */
+const ABILITY_ALIGNMENT={
+    // ── Good ──────────────────────────────────────────────────────
+    lay_on_hands:'good', divine_heal:'good',  rallying_cry:'good',
+    holy_aegis:'good',   turn_undead:'good',  divine_smite:'good',
+    spirit_totem:'good', inspire:'good',      judgment:'good',
+    regrowth:'good',     shield_wall:'good',
+    // ── Evil ──────────────────────────────────────────────────────
+    pact_of_blood:'evil', life_drain:'evil',  blood_surge:'evil',
+    hunters_mark:'evil',  wither:'evil',      undead_barrier:'evil',
+    hex:'evil',           backstab:'evil',    poison_blade:'evil',
+    necro_barrier:'evil', dirge:'evil',
+};
+
+/* Returns HTML icon prefix for a button label */
+function getAlignIcon(abilityId){
+    const a=ABILITY_ALIGNMENT[abilityId];
+    if(a==='good') return `<span style="color:#e8c45a">✦</span> `;
+    if(a==='evil') return `<span style="color:#cc3333">☠</span> `;
+    return '';
+}
+
+/* Morality flash — animated +/- overlay on portrait card */
+function flashMorality(hero,delta){
+    if(!delta)return;
+    const hi=party.indexOf(hero);
+    if(hi<0)return;
+    const card=document.getElementById(`portrait-card-${hi}`);
+    if(!card)return;
+    const el=document.createElement('div');
+    el.className='moral-flash';
+    el.style.color=delta>0?'#6abf45':'#cc3333';
+    el.textContent=(delta>0?'+':'')+delta+' ⚖';
+    card.appendChild(el);
+    setTimeout(()=>el.remove(),2400);
+}
+/* Drop-in replacement for direct morality clamp assignments */
+function changeMorality(hero,delta){
+    hero.morality=clamp(hero.morality+delta,-100,100);
+    flashMorality(hero,delta);
+}
+
+/* Returns null (neutral ability) or {roll,aligned,abilityAlign}:
+   aligned=true  → hero alignment matches → bonus effect
+   aligned=false → opposing alignment → morality penalty
+   aligned=null  → neutral hero, small nudge only               */
+function computeHeroAlignState(hero,abilityId){
+    const abilityAlign=ABILITY_ALIGNMENT[abilityId];
+    if(!abilityAlign) return null;
+    const roll=rand(1,5);
+    const heroGood=hero.morality>10, heroEvil=hero.morality<-10;
+    if(abilityAlign==='good'&&heroGood)  return{roll,aligned:true, abilityAlign};
+    if(abilityAlign==='evil'&&heroEvil)  return{roll,aligned:true, abilityAlign};
+    if(abilityAlign==='good'&&heroEvil)  return{roll,aligned:false,abilityAlign};
+    if(abilityAlign==='evil'&&heroGood)  return{roll,aligned:false,abilityAlign};
+    return{roll,aligned:null,abilityAlign}; // neutral hero: gentle nudge
+}
 
 /* ═══════════════════════════════════════════════════════════════
    6. ABILITY EFFECTS
@@ -537,10 +627,10 @@ const ABILITY_EFFECTS={
 
     /* ── Warriors ── */
     shield_wall:(h,hi)=>{battle.heroShielded[hi]=(battle.heroShielded[hi]||0)+1;log(`${h.name} raises their shield — the next blow will be absorbed.`);SFX.shield();finishAbilityTurn();},
-    rallying_cry:(h)=>{const heal=Math.max(1,Math.round(Math.floor(0.12*h.maxHp)*getDiceMult()));party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+heal,x.maxHp);});const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} sounds a Rallying Cry! All allies recover ${heal} HP. (${h.name} spends ${cost} HP in the effort)`);SFX.ability();finishAbilityTurn();},
+    rallying_cry:(h)=>{const ab=battle.alignmentBonus?.aligned===true?battle.alignmentBonus.roll:0;const heal=Math.max(1,Math.round(Math.floor(0.12*h.maxHp)*getDiceMult())+ab);party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+heal,x.maxHp);});const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} sounds a Rallying Cry! All allies recover ${heal} HP. (${h.name} spends ${cost} HP in the effort)`);SFX.ability();finishAbilityTurn();},
     rage:(h,hi)=>{battle.heroRage[hi]=3;log(`${h.name} enters a RAGE! +70% damage for 3 rounds.`);SFX.ability();finishAbilityTurn();},
     reckless_atk:(h,hi)=>{log(`${h.name} swings a Reckless Attack — 2× power!`);executeAttack(h,hi,2.0);},
-    second_wind:(h)=>{const heal=Math.max(1,Math.round(Math.floor(0.20*h.maxHp)*getDiceMult()));h.hp=Math.min(h.hp+heal,h.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} finds a Second Wind! +${heal} HP. (Morality −1 — self-preservation over the mission)`);SFX.heal();finishAbilityTurn();},
+    second_wind:(h)=>{const heal=Math.max(1,Math.round(Math.floor(0.20*h.maxHp)*getDiceMult()));h.hp=Math.min(h.hp+heal,h.maxHp);changeMorality(h,-1);log(`${h.name} finds a Second Wind! +${heal} HP. (Morality −1 — self-preservation over the mission)`);SFX.heal();finishAbilityTurn();},
     action_surge:(h,hi)=>{
         log(`${h.name} surges — attacking twice!`);SFX.ability();
         resolveHeroHit(h,hi,pick(h.attackNames),1.0);
@@ -553,9 +643,9 @@ const ABILITY_EFFECTS={
     },
 
     /* ── Holy ── */
-    lay_on_hands:(h)=>{const w=party.filter(x=>x.hp>0&&x.hp/x.maxHp<=0.30);const t=w.length?w[0]:h;const a=Math.max(1,Math.round((w.length?t.maxHp:Math.floor(0.40*h.maxHp))*getDiceMult()));t.hp=Math.min(t.hp+a,t.maxHp);log(`${h.name} lays hands on ${t.name}! +${a} HP.`);SFX.heal();finishAbilityTurn();},
+    lay_on_hands:(h)=>{const ab=battle.alignmentBonus?.aligned===true?battle.alignmentBonus.roll:0;const w=party.filter(x=>x.hp>0&&x.hp/x.maxHp<=0.30);const t=w.length?w[0]:h;const a=Math.max(1,Math.round((w.length?t.maxHp:Math.floor(0.40*h.maxHp))*getDiceMult())+ab);t.hp=Math.min(t.hp+a,t.maxHp);log(`${h.name} lays hands on ${t.name}! +${a} HP.`);SFX.heal();finishAbilityTurn();},
     divine_smite:(h,hi)=>{const isEvil=DAMAGE_TYPES[battle.monster.damageType]?.alignment==='dark'||battle.monster.undead;const mult=isEvil?2.5:2.0;log(`${h.name} calls Divine Smite!${isEvil?' Extra judgement against this evil foe!':''}`);executeAttack(h,hi,mult,false,'holy');},
-    divine_heal:(h)=>{const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const a=Math.max(1,Math.round(Math.floor(0.35*t.maxHp)*getDiceMult()));t.hp=Math.min(t.hp+a,t.maxHp);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} channels Divine Heal to ${t.name}! +${a} HP. (Morality −1 — cannot save everyone)`);SFX.heal();finishAbilityTurn();},
+    divine_heal:(h)=>{const ab=battle.alignmentBonus?.aligned===true?battle.alignmentBonus.roll:0;const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const a=Math.max(1,Math.round(Math.floor(0.35*t.maxHp)*getDiceMult())+ab);t.hp=Math.min(t.hp+a,t.maxHp);changeMorality(h,-1);log(`${h.name} channels Divine Heal to ${t.name}! +${a} HP. (Morality −1 — cannot save everyone)`);SFX.heal();finishAbilityTurn();},
     turn_undead:(h,hi)=>{const isU=!!battle.monster.undead;if(!isU){battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);log(`${h.name} invokes Turn Undead — the creature is stunned!`);}else{log(`${h.name} invokes Turn Undead! Holy power blazes against the undead!`);}executeAttack(h,hi,isU?3.0:1.0,false,'holy');},
     holy_aegis:(h)=>{party.forEach((_,i)=>{battle.heroShielded[i]=(battle.heroShielded[i]||0)+1;});const cost=Math.min(8,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} raises Holy Aegis — whole party shielded! (${h.name} spends ${cost} HP in divine exertion)`);SFX.shield();finishAbilityTurn();},
     judgment:(h,hi)=>{battle.judgmentPrimed[hi]=true;log(`${h.name} marks ${battle.monster.name} with Judgment!`);SFX.ability();finishAbilityTurn();},
@@ -565,7 +655,7 @@ const ABILITY_EFFECTS={
     /* ── Rogues ── */
     backstab:(h,hi)=>{if(!battle.monsterAttackedLastRound){log(`${h.name} cannot find an opening for Backstab — improvises a quick jab (0.7×)!`);SFX.strike();executeAttack(h,hi,0.70);return;}log(`${h.name} drives a Backstab — 2.5× damage!`);executeAttack(h,hi,2.5);},
     vanish:(h)=>{log(`${h.name} vanishes into shadow — the fellowship retreats!`);SFX.flee();battle.active=false;setTimeout(nextTurn,500);},
-    hunters_mark:(h,hi)=>{battle.heroDmgMult[hi]={mult:1.6,rounds:3};h.morality=clamp(h.morality-1,-100,100);log(`${h.name} applies Hunter's Mark — +60% damage for 3 attacks. (Morality −1 — a death-mark is a dark rite)`);SFX.ability();finishAbilityTurn();},
+    hunters_mark:(h,hi)=>{battle.heroDmgMult[hi]={mult:1.6,rounds:3};changeMorality(h,-1);log(`${h.name} applies Hunter's Mark — +60% damage for 3 attacks. (Morality −1 — a death-mark is a dark rite)`);SFX.ability();finishAbilityTurn();},
     distracting_shot:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);const cost=Math.min(3,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} fires a Distracting Shot — monster loses next action! (${h.name} exposes herself for ${cost} HP)`);SFX.ability();finishAbilityTurn();},
     poison_blade:(h)=>{battle.dotEffects.push({dmgPerRound:18,dmgType:'poison',rounds:3,source:h.name});log(`${h.name} applies deep Poison — 18 poison damage/round for 3 rounds.`);SFX.ability();finishAbilityTurn();},
     smoke_bomb:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,1);const cost=Math.min(3,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} hurls a Smoke Bomb — monster blinded, next attack misses! (${h.name} inhales fumes for ${cost} HP)`);SFX.ability();finishAbilityTurn();},
@@ -602,10 +692,10 @@ const ABILITY_EFFECTS={
         if(eff==='freeze'){battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,2);log('Monster frozen for 2 turns!');finishAbilityTurn();return;}
         if(eff==='heal'){party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+25,x.maxHp);});log('The surge heals all allies for 25 HP!');SFX.heal();finishAbilityTurn();return;}
         if(eff==='loot'){giveLoot();log('The surge summons a relic from the ether!');finishAbilityTurn();return;}
-        if(eff==='recoil'){const d=rand(20,40);h.hp=Math.max(1,h.hp-d);h.morality=clamp(h.morality+1,-100,100);log(`The surge backfires — ${h.name} takes ${d} damage! (Morality +1 — enduring chaos with dignity)`);SFX.bad();shake();finishAbilityTurn();return;}
+        if(eff==='recoil'){const d=rand(20,40);h.hp=Math.max(1,h.hp-d);changeMorality(h,1);log(`The surge backfires — ${h.name} takes ${d} damage! (Morality +1 — enduring chaos with dignity)`);SFX.bad();shake();finishAbilityTurn();return;}
     },
     undead_barrier:(h,hi)=>{battle.heroShielded[hi]=(battle.heroShielded[hi]||0)+1;log(`${h.name} raises an Undead Barrier — next hit absorbed.`);SFX.shield();finishAbilityTurn();},
-    wither:(h,hi)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.70);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,2);h.morality=clamp(h.morality-1,-100,100);log(`${h.name} casts Wither — monster −30% attack + 1.5× necrotic hit! (Morality −1 — necrotic arts exact their toll)`);executeAttack(h,hi,1.5,false,'necrotic');},
+    wither:(h,hi)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.70);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,2);changeMorality(h,-1);log(`${h.name} casts Wither — monster −30% attack + 1.5× necrotic hit! (Morality −1 — necrotic arts exact their toll)`);executeAttack(h,hi,1.5,false,'necrotic');},
     combustion:(h,hi)=>{battle.combustPrimed[hi]=true;log(`${h.name} primes Combustion — next Fireball deals 3×!`);SFX.ability();finishAbilityTurn();},
     inferno_dot:(h)=>{battle.dotEffects.push({dmgPerRound:20,dmgType:'fire',rounds:3,source:h.name});log(`${h.name} sets ${battle.monster.name} ablaze — 20 fire damage/round for 3 rounds.`);SFX.ability();finishAbilityTurn();},
     reality_tear:(h)=>{battle.monsterResistNullified=true;const cost=Math.min(8,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} tears Reality — monster defences nullified for this battle! (${h.name} bleeds ${cost} HP from the strain)`);SFX.ability();finishAbilityTurn();},
@@ -614,7 +704,7 @@ const ABILITY_EFFECTS={
     /* ── Hybrids ── */
     hex:(h)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.80);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,3);log(`${h.name} places a Hex — monster −20% attack for 3 rounds.`);SFX.ability();finishAbilityTurn();},
     pact_of_blood:(h,hi)=>{const s=Math.floor(0.25*h.maxHp);h.hp=Math.max(1,h.hp-s);log(`${h.name} invokes the Pact of Blood (sacrifice ${s} HP) — 3×!`);executeAttack(h,hi,3.0);},
-    inspire:(h,hi)=>{
+    inspire:(h)=>{
         let ti=null;
         for(let i=1;i<battle.order.length;i++){const e=battle.order[(battle.turnIdx+i)%battle.order.length];if(e.type==='hero'&&e.entity.hp>0){ti=party.indexOf(e.entity);break;}}
         if(ti!==null){battle.inspiredHero=ti;log(`${h.name} Inspires ${party[ti].name} — their next attack deals 2×!`);}
@@ -650,7 +740,7 @@ const ABILITY_EFFECTS={
     },
     blood_surge:(h,hi)=>{const s=Math.floor(0.25*h.maxHp);h.hp=Math.max(1,h.hp-s);log(`${h.name} surges with Blood (sacrifice ${s} HP) — 2.5×!`);executeAttack(h,hi,2.5);},
     natures_grasp:(h)=>{battle.monsterAtkMult=Math.min(battle.monsterAtkMult,0.65);battle.monsterAtkMultRounds=Math.max(battle.monsterAtkMultRounds,2);log(`${h.name} uses Nature's Grasp — monster −35% attack for 2 rounds.`);SFX.ability();finishAbilityTurn();},
-    barkskin:(h)=>{party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+20,x.maxHp+20);x.maxHp+=20;});h.morality=clamp(h.morality-1,-100,100);log(`${h.name} hardens Barkskin — everyone gains +20 temporary HP. (Morality −1 — twisting nature is not without cost)`);SFX.ability();finishAbilityTurn();},
+    barkskin:(h)=>{party.filter(x=>x.hp>0).forEach(x=>{x.hp=Math.min(x.hp+20,x.maxHp+20);x.maxHp+=20;});changeMorality(h,-1);log(`${h.name} hardens Barkskin — everyone gains +20 temporary HP. (Morality −1 — twisting nature is not without cost)`);SFX.ability();finishAbilityTurn();},
     entangle:(h)=>{battle.monsterSkipTurns=Math.max(battle.monsterSkipTurns,2);const cost=Math.min(5,h.hp-1);h.hp=Math.max(1,h.hp-cost);log(`${h.name} casts Entangle — monster rooted for 2 turns! (${h.name} bleeds ${cost} HP binding the roots)`);SFX.ability();finishAbilityTurn();},
     regrowth:(h)=>{const t=party.filter(x=>x.hp>0).reduce((b,x)=>(x.hp/x.maxHp)<(b.hp/b.maxHp)?x:b);const ti=party.indexOf(t);battle.heroRegen[ti]={amount:Math.floor(0.08*t.maxHp),rounds:3};log(`${h.name} applies Regrowth to ${t.name} — regenerates ${battle.heroRegen[ti].amount} HP/round for 3 rounds.`);SFX.ability();finishAbilityTurn();},
 };
@@ -741,6 +831,17 @@ function partyAlignmentMod(){
     if(lightW>0&&darkW>0)return -Math.min(lightW,darkW);
     return Math.floor(Math.max(lightW,darkW)/2);
 }
+function partyConflictGap(){
+    const alive=party.filter(h=>h&&h.hp>0);
+    if(alive.length<2)return 0;
+    const m=alive.map(h=>h.morality);
+    return Math.max(...m)-Math.min(...m);
+}
+function conflictStatBonus(hero){
+    const gap=partyConflictGap();
+    if(gap<20)return 0;
+    return Math.min(20,Math.floor(gap/10));
+}
 function alignIcon(morality){
     if(morality>30)return '😇';
     if(morality<-30)return '😈';
@@ -785,7 +886,7 @@ function renderSetup(){
         // Wire tooltips via global JS system (immune to overflow:hidden)
         const raceData=GAME_DATA.races.find(r=>r.name===h.race);
         const clsData=GAME_DATA.classes.find(cl=>cl.name===h.job);
-        const initMod=Math.floor((h.dex+h.lck)/4);
+        const initMod=Math.floor(h.dex/4);
         const resHTML=Object.entries(h.resistances).filter(([,v])=>v!==0)
             .map(([k,v])=>`<span style="color:#ff7733">${k}: ${v>0?'+':''}${v}%</span>`).join('  ')||'None';
 
@@ -854,15 +955,16 @@ function renderSetup(){
         if(nameEl) showTip(nameEl, leaderTip);
 
         // Stats tooltip — covers the whole grid
+        const lkBon=Math.round((h.lck-10)/5);
         const statsTip=
             `<span style="color:#6abf45">HP ${h.hp}</span> — hit points before falling in combat<br>`+
             `<span style="color:${h.primaryStat==='str'?'#88ccff':'#888888'}">STR ${h.str}</span> — melee / physical damage${h.primaryStat==='str'?' <span style="color:#e8c45a">★ primary</span>':''}<br>`+
             `<span style="color:${h.primaryStat==='int'?'#88ccff':'#888888'}">INT ${h.int}</span> — spell / arcane damage${h.primaryStat==='int'?' <span style="color:#e8c45a">★ primary</span>':''}<br>`+
-            `<span style="color:${h.primaryStat==='dex'?'#88ccff':'#888888'}">DEX ${h.dex}</span> — initiative order and crit chance${h.primaryStat==='dex'?' <span style="color:#e8c45a">★ primary</span>':''}<br>`+
+            `<span style="color:${h.primaryStat==='dex'?'#88ccff':'#888888'}">DEX ${h.dex}</span> — dodge ${Math.min(22,Math.round(h.dex/90*100))}% · acc +${Math.floor(h.dex/8)} dmg · crit ${Math.round(Math.min(35,h.dex/120*100))}% · flee${h.primaryStat==='dex'?' <span style="color:#e8c45a">★ primary</span>':''}<br>`+
             `<span style="color:#888888">CHA ${h.cha}</span> — cohesion and scenario social checks<br>`+
             `<span style="color:#888888">STA ${h.sta}</span> — stamina; affects resting and endurance<br>`+
-            `<span style="color:#888888">LCK ${h.lck}</span> — crit chance, item finds, and initiative<br>`+
-            `<br><span style="color:#aaaaaa">Initiative bonus: <span style="color:#88ccff">+${initMod}</span> (DEX+LCK÷4)<br>`+
+            `<span style="color:#888888">LCK ${h.lck}</span> — dice roll modifier (${lkBon>=0?'+':''}${lkBon}) · loot fortune<br>`+
+            `<br><span style="color:#aaaaaa">Initiative bonus: <span style="color:#88ccff">+${initMod}</span> (DEX÷4)<br>`+
             `Hover over Race or Class for detailed lore.</span>`;
         const stats1El=d.querySelector(`[data-setup-stats1="${i}"]`);
         if(stats1El) showTip(stats1El, statsTip);
@@ -1034,7 +1136,7 @@ function renderPortraitStrip(){
             const dead=h.hp<=0;
             const hpPct=h.maxHp>0?h.hp/h.maxHp*100:0;
             const hpCol=hpPct>55?'#4db84d':hpPct>25?'#c8a040':'#aa2222';
-            const initMod=Math.floor((h.dex+h.lck)/4);
+            const initMod=Math.floor(h.dex/4);
             const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
             const aura=Math.ceil(h.leadership/5);
             const dtAlign=DAMAGE_TYPES[h.damageType]?.alignment||'neutral';
@@ -1044,7 +1146,8 @@ function renderPortraitStrip(){
             const atkLine=`<span style="color:#c8c0b0">⚔ Basic: ${h.attackNames.join(' · ')}</span> <span style="color:#aaaaaa">(INIT cost:1 · net +1)</span>`;
             const abilLines=atkLine+'<br>'+[...h.abilities].sort((a,b)=>a.cooldown-b.cooldown).map(a=>{const cd=h.abilityCooldowns?.[a.id]||0;const net=2-a.cooldown;const netCol=net>=0?'#6abf45':net>=-2?'#c8a040':'#cc3333';return `<span style="color:#e879f9">${a.name}</span> <span style="color:#aaaaaa">INIT cost:${a.cooldown} · net <span style="color:${netCol}">${net>=0?'+':''}${net}</span>${cd>0?' · ⏳'+cd+'rnd':' · ✓'}</span><br><span style="color:#bbbbbb;padding-left:8px">${a.desc}</span>`;}).join('<br>');
             const cohMod=partyAlignmentMod();
-            const statTip=`<b>${h.name}</b> Lv.${h.level}<br><span style="color:#88ccff">STR:${h.str} INT:${h.int} DEX:${h.dex}<br>CHA:${h.cha} STA:${h.sta} LCK:${h.lck}</span><br>INIT:+${initMod} · Lead:${h.leadership} (Aura +${aura})<br>⚖ ${moralLabel} (${h.morality})${moralDmgBonus>0?' +'+moralDmgBonus+' '+h.damageType:''}${scenMod!==0?' · scenario '+(scenMod>0?'-':'+')+Math.abs(scenMod)+' dmg':''}<br>Cohesion: ${cohMod>0?'+'+cohMod+' ✦ Aligned':cohMod<0?cohMod+' ⚠ Divided':'0 Neutral'}<br><span style="color:#ff7733">Resist: ${resLines}</span><br>${abilLines}`;
+            const lkBonC=getLuckBonus(h);
+            const statTip=`<b>${h.name}</b> Lv.${h.level}<br><span style="color:#88ccff">STR:${h.str} INT:${h.int}</span><br>DEX:${h.dex} dodge${Math.min(22,Math.round(h.dex/90*100))}% acc+${Math.floor(h.dex/8)} crit${Math.round(Math.min(35,h.dex/120*100))}%<br>LCK:${h.lck} dice${lkBonC>=0?'+':''}${lkBonC} loot✦<br><span style="color:#88ccff">CHA:${h.cha} STA:${h.sta}</span><br>INIT:+${initMod} · Lead:${h.leadership} (Aura +${aura})<br>⚖ ${moralLabel} (${h.morality})${moralDmgBonus>0?' +'+moralDmgBonus+' '+h.damageType:''}${scenMod!==0?' · scenario '+(scenMod>0?'-':'+')+Math.abs(scenMod)+' dmg':''}<br>Cohesion: ${cohMod>0?'+'+cohMod+' ✦ Aligned':cohMod<0?cohMod+' ⚠ Divided':'0 Neutral'}<br><span style="color:#ff7733">Resist: ${resLines}</span><br>${abilLines}`;
             const hpTip=`<span style="color:#6abf45">HP: ${h.hp}/${h.maxHp}</span>  XP: ${h.xp}/${h.xpNext}`;
             const spr=portraitStyleSized(h,66,84);
             return buildCard(spr,{
@@ -1060,7 +1163,7 @@ function renderPortraitStrip(){
         order.forEach(({h,i})=>{
             const card=document.getElementById(`portrait-card-${i}`);
             if(!card)return;
-            const initMod=Math.floor((h.dex+h.lck)/4);
+            const initMod=Math.floor(h.dex/4);
             const moralLabel=h.morality>30?'Righteous':h.morality>10?'Good':h.morality>-10?'Neutral':h.morality>-30?'Shadowed':'Corrupt';
             const moralCol=h.morality>30?'#e8c45a':h.morality>10?'#6abf45':h.morality>-10?'#aaaaaa':h.morality>-30?'#c8802a':'#cc3333';
             const aura2=Math.ceil(h.leadership/5);
@@ -1081,17 +1184,24 @@ function renderPortraitStrip(){
             const raceLore=raceData?.lore?`<br><em style="color:#aaaaaa;font-style:italic">${raceData.lore}</em>`:'';
             const clsLore=clsData?.lore?`<br><em style="color:#aaaaaa;font-style:italic">${clsData.lore}</em>`:'';
             const genderLore=genderLoreText?`<br><em style="color:#aaaaaa;font-style:italic">${genderLoreText}</em>`:'';
+            const lkBon2=getLuckBonus(h);
+            const conflGap=partyConflictGap();
+            const conflBon=conflictStatBonus(h);
+            const conflLine=conflGap>=20
+                ?`<br><span style="color:#e8c45a">⚖ Ancient Wisdom</span> <span style="color:#aaaaaa">(party moral gap: ${conflGap}) — +${conflBon} damage</span>`:'';
             const statHtml=
                 `<b style="color:#ffffff">${h.name}</b>  <span style="color:#88ccff">Lv.${h.level}</span><br>`+
-                `${tc('stat','STR:'+h.str+'  INT:'+h.int+'  DEX:'+h.dex)}<br>`+
-                `${tc('stat','CHA:'+h.cha+'  STA:'+h.sta+'  LCK:'+h.lck)}<br>`+
-                `Initiative bonus: +${initMod}<br>`+
+                `${tc('stat','STR:'+h.str+'  INT:'+h.int)}<br>`+
+                `<span style="color:#88ccff">DEX:${h.dex}</span>  <span style="color:#aaaaaa">dodge ${Math.min(22,Math.round(h.dex/90*100))}% · acc +${Math.floor(h.dex/8)} dmg · crit ${Math.round(Math.min(35,h.dex/120*100))}% · flee bonus</span><br>`+
+                `<span style="color:#88ccff">LCK:${h.lck}</span>  <span style="color:#aaaaaa">dice roll ${lkBon2>=0?'+':''}${lkBon2} · loot fortune${lkBon2>0?' ✦':''}</span><br>`+
+                `${tc('stat','CHA:'+h.cha+'  STA:'+h.sta)}<br>`+
+                `Initiative bonus: +${initMod} (DEX÷4)<br>`+
                 (resLines!=='None'?`${tc('warn','Resistances: '+resLines)}<br>`:'')+
                 `<br><span style="color:#e8c45a">✦ Inspiring Aura  (Leadership ${h.leadership})</span><br>`+
                 `Grants +${aura2} max HP to allies · +${aura2} XP per combat victory.<br>`+
                 `<br><span style="font-size:1.2em">${alignIcon(h.morality)}</span> <span style="color:${moralCol};font-weight:bold">⚖ ${moralLabel}  (${h.morality})</span><br>`+
                 `${moralAlignLine}`+(scenModLine?`  <span style="color:#aaaaaa">· ${scenModLine}</span>`:'')+`<br>`+
-                `${cohLine}<br>`+
+                `${cohLine}${conflLine}<br>`+
                 `<br><span style="color:#e879f9">Abilities</span><br>${abilLines}`+
                 `<br><br><span style="color:#e8c45a">${h.race}</span>${raceLore}`+
                 `<br><br><span style="color:#e8c45a">${h.job}</span>${clsLore}`+
@@ -1283,7 +1393,7 @@ function resolveScenario(opt){
         if(boldRoll<0.30){giveLoot();log(`Fortune favours the bold — ${h.name} finds something useful amid the chaos!`);SFX.loot();}
         else if(boldRoll<0.55){const s=pick(['str','int','dex','cha','sta','lck']);h[s]+=1;log(`Adversity sharpens the mind. ${h.name} gains +1 ${s.toUpperCase()} from the ordeal.`);SFX.good();}
         else if(boldRoll<0.75){const hpR=Math.floor(h.maxHp*0.10);h.hp=Math.min(h.hp+hpR,h.maxHp);log(`${h.name} rallies after the ordeal, recovering ${hpR} HP.`);SFX.heal();}
-        else{h.morality=clamp(h.morality+1,-100,100);log(`${h.name} faces the hardship with dignity. (Morality +1)`);SFX.good();}
+        else{changeMorality(h,1);log(`${h.name} faces the hardship with dignity. (Morality +1)`);SFX.good();}
         log(`Bold path rewarded: +${boldXpBonus} bonus XP.`);
         grantXP(h,boldXpBonus);
     }
@@ -1303,7 +1413,7 @@ function resolveScenario(opt){
             else{const g=rand(10,30);treasury.gold+=g;log(`The uncertain path leads past forgotten coin. +${g} gold.`);SFX.treasury();}
         }
     }
-    if(opt.morality)h.morality=clamp(h.morality+opt.morality,-100,100);
+    if(opt.morality)changeMorality(h,opt.morality);
     log(`${h.name}: ${opt.effect}`);grantXP(h,opt.xp??15);setTimeout(nextTurn,40);
 }
 function resolveGated(hero,g){
@@ -1313,7 +1423,7 @@ function resolveGated(hero,g){
     if(g.bonus?.dex)hero.dex+=g.bonus.dex;if(g.bonus?.cha)hero.cha+=g.bonus.cha;
     if(g.bonus?.sta)hero.sta+=g.bonus.sta;if(g.bonus?.lck)hero.lck+=g.bonus.lck;
     if(g.item)giveLoot();
-    if(g.morality)hero.morality=clamp(hero.morality+(g.morality||0),-100,100);
+    if(g.morality)changeMorality(hero,g.morality||0);
     log(`✦ ${hero.name} (${g.requires.stat.toUpperCase()} ${hero[g.requires.stat]}): ${g.effect}`);
     grantXP(hero,g.xp??30);setTimeout(nextTurn,40);
 }
@@ -1373,7 +1483,7 @@ function doCombat(){
     processBattleTurn();
 }
 
-function rollInitiative(h){return rand(1,20)+Math.floor(h.dex/4)+Math.floor(h.lck/5)+(h.isLeader?2:0)+partyAlignmentMod();}
+function rollInitiative(h){return rand(1,20)+Math.floor(h.dex/4)+(h.isLeader?2:0)+partyAlignmentMod();}
 function allMonstersDead(){return battle.monsters.every(m=>m.currentHp<=0);}
 function updateTarget(){
     if(battle.monster&&battle.monster.currentHp>0)return;
@@ -1435,6 +1545,7 @@ function processBattleTurn(){
 
 function advanceBattleTurn(){
     battle.currentRoll=null;
+    battle.alignmentBonus=null;
     battle.turnIdx=(battle.turnIdx+1)%battle.order.length;
     if(battle.turnIdx===0){
         battle.round++;processRoundEffects();
@@ -1464,6 +1575,15 @@ function doMonsterTurn(actingMonster){
         if(!battle.active)return;
         const target=valid[Math.floor(Math.random()*valid.length)],ti=party.indexOf(target);
         if(battle.heroPhaseShift[ti]>0)battle.heroPhaseShift[ti]--;
+        // DEX-based dodge (nat 20 always hits)
+        if(result.roll!==20){
+            const dodgeChance=Math.min(0.22,target.dex/90);
+            if(Math.random()<dodgeChance){
+                logHTML(`${target.name} <span style="color:#88ccff">sidesteps</span> the blow! (DEX ${target.dex})`);
+                SFX.dodge();battle.monsterAttackedLastRound=false;
+                advanceBattleTurn();renderStats();setTimeout(processBattleTurn,500);return;
+            }
+        }
         const mDT=actingMonster.damageType||'physical',res=target.resistances?.[mDT]??0;
         const rawDmg=Math.max(1,Math.round((Math.round(actingMonster.str*battle.monsterAtkMult)+rand(-3,3))*result.mult));
         if(battle.heroShielded[ti]>0){battle.heroShielded[ti]--;log(`${target.name}'s shield absorbs the blow!`);SFX.shield();}
@@ -1494,7 +1614,7 @@ function showHeroAction(hero){
     const sv=hero[hero.primaryStat];
     const minD=Math.max(1,Math.floor(sv*0.50)+1+hero.bonusDmg);
     const maxD=Math.max(1,Math.floor(sv*0.50)+Math.max(2,Math.floor(sv*0.15))+hero.bonusDmg);
-    const critP=Math.round(Math.min(35,(hero.dex+hero.lck)/240*100));
+    const critP=Math.round(Math.min(35,hero.dex/120*100));
     const mData=GAME_DATA.monsters.find(x=>x.name===battle.monster.name);
     const mLore=mData?.lore?`<br><br>${tc('lore',mData.lore)}`:'';
 
@@ -1535,16 +1655,23 @@ function showHeroAction(hero){
             :isHighCost
             ?`<br><br>${tc('lore','Heavy ability — killing blow with mult ≥2× when at full HP costs Morality −1 (should have known better)')}`
             :'';
+        const abAlign=ABILITY_ALIGNMENT[ab.id];
+        const alignTip=abAlign==='good'
+            ?`<br><br><span style="color:#e8c45a">✦ Good action</span> — <span style="color:#aaaaaa">Righteous heroes (morality >10) roll 1–5 bonus power. Corrupt heroes suffer a 1–5 morality penalty.</span>`
+            :abAlign==='evil'
+            ?`<br><br><span style="color:#cc3333">☠ Evil action</span> — <span style="color:#aaaaaa">Corrupt heroes (morality <−10) roll 1–5 bonus power. Righteous heroes suffer a 1–5 morality penalty.</span>`
+            :'';
+        const alignIcon=getAlignIcon(ab.id);
         const abTip=`${tc(tipColor,ab.name)}<br>`+
             `${tc('skill',ab.desc)}<br><br>`+
             (ready?`${tc('good','✓ Ready')}`:`${tc('warn','⏳ Cooldown: '+cd+' round(s) remaining')}`)+
             `<br>Cooldown: ${ab.cooldown} rounds after use<br>`+
             `Initiative cost: ${tc(costCol,abCost+' ('+costLabel+')')} · Recovery on hit: ${tc('good','+2')} · Net: ${tc(netCol,(netInit>=0?'+':'')+netInit)}<br>`+
             `Current initiative: ${tc('stat',curInit)}`+
-            riskHint+
+            riskHint+alignTip+
             (battle.monster.name&&mData?`<br><br>${tc('lore',mData.name)}${mLore}`:'')+DICE_TIP;
         choices.push({
-            label:`[${choices.length+1}] ${ab.name}`+(ready?'':'  ('+cd+' rnd)')+`  — ${ab.desc}`,
+            label:`[${choices.length+1}] ${alignIcon}${ab.name}`+(ready?'':'  ('+cd+' rnd)')+`  — ${ab.desc}`,
             disabled:!ready,
             cooldown:!ready,
             tooltip:abTip,
@@ -1554,13 +1681,14 @@ function showHeroAction(hero){
                 hero.abilityCooldowns[ab.id]=ab.cooldown;
                 const fn=ABILITY_EFFECTS[ab.id];
                 if(!fn){log(`[Error: ability ${ab.id} not found — skipping turn]`);finishAbilityTurn();return;}
-                withDiceRoll(hi,()=>fn(hero,hi));
+                withDiceRoll(hi,()=>fn(hero,hi),ab.id);
             },
         });
     });
     if(hero.isLeader){
+        const fleeSuccessPct=Math.round(Math.min(80,40+hero.dex/90*100));
         const fleeTip=`${tc('warn','Attempt to escape combat')}<br>`+
-            `~55% chance of success<br><br>`+
+            `~${fleeSuccessPct}% chance of success <span style="color:#aaaaaa">(DEX ${hero.dex})</span><br><br>`+
             `${tc('warn','⚠ Failure: battle continues')}<br>`+
             `${tc('warn','⚠ Success: −5 Morality (cowardice)')}<br>`+
             `Only the party leader may attempt this.`;
@@ -1597,7 +1725,7 @@ function showHeroAction(hero){
 function executeAttackWithMorality(hero,hi,mult,isBasic=false){
     resolveHeroHit(hero,hi,pick(hero.attackNames),mult);
     if(handleMonsterDeath()){
-        if(isBasic){const hadAbility=hero.abilities.some(ab=>(hero.abilityCooldowns[ab.id]||0)===0);if(hadAbility){hero.morality=clamp(hero.morality+1,-100,100);log(`${hero.name} dispatched the foe with honour. (Morality +1)`);}}
+        if(isBasic){const hadAbility=hero.abilities.some(ab=>(hero.abilityCooldowns[ab.id]||0)===0);if(hadAbility){changeMorality(hero,1);log(`${hero.name} dispatched the foe with honour. (Morality +1)`);}}
         endCombat(true);return;
     }
     advanceBattleTurn();renderStats();setTimeout(processBattleTurn,300);
@@ -1614,7 +1742,7 @@ function executeAttackWithMorality(hero,hi,mult,isBasic=false){
 function executeAttack(hero,hi,mult,_guaranteeHit=false,overrideDmgType=null){
     resolveHeroHit(hero,hi,pick(hero.attackNames),mult,overrideDmgType);
     if(handleMonsterDeath()){
-        if(mult>=2.0&&hero.hp/hero.maxHp>=0.90){hero.morality=clamp(hero.morality-1,-100,100);log(`${hero.name} — great power spent when restraint would have served. (Morality −1)`);}
+        if(mult>=2.0&&hero.hp/hero.maxHp>=0.90){changeMorality(hero,-1);log(`${hero.name} — great power spent when restraint would have served. (Morality −1)`);}
         endCombat(true);return;
     }
     advanceBattleTurn();
@@ -1633,12 +1761,19 @@ function resolveHeroHit(hero,hi,atkName,mult,overrideDmgType=null){
     dmg=Math.round(dmg*mult);
     // Apply d20 dice roll modifier
     if(battle.currentRoll)dmg=Math.round(dmg*battle.currentRoll.mult);
+    // Apply alignment bonus (flat, after dice scaling)
+    if(battle.alignmentBonus?.aligned===true)dmg+=battle.alignmentBonus.roll;
+    // DEX accuracy bonus — precision and reach in combat
+    dmg+=Math.floor(hero.dex/8);
+    // Ancient Wisdom — bonus from a morally divided fellowship
+    const conflictBonus=conflictStatBonus(hero);
+    if(conflictBonus>0)dmg+=conflictBonus;
     if(battle.heroRage[hi]>0)dmg=Math.round(dmg*1.70);
     if(battle.heroDmgMult[hi])dmg=Math.round(dmg*battle.heroDmgMult[hi].mult);
     if(battle.inspiredHero===hi){dmg=Math.round(dmg*2.0);battle.inspiredHero=null;log(`${hero.name} is Inspired — double damage!`);}
     if(battle.combustPrimed[hi]){dmg=Math.round(dmg*3.0);battle.combustPrimed[hi]=false;log(`Combustion triggers — 3×!`);}
     if(battle.judgmentPrimed[hi]){const jm=battle.monster.undead?2.0:1.5;dmg=Math.round(dmg*jm);battle.judgmentPrimed[hi]=false;log(`Judgment strikes! ×${jm}!`);}
-    const critChance=Math.min(0.35,(hero.dex+hero.lck)/240);
+    const critChance=Math.min(0.35,hero.dex/120);
     const isCrit=Math.random()<critChance;
     if(isCrit)dmg=Math.round(dmg*1.75);
     const dmgType=overrideDmgType||hero.damageType;
@@ -1679,7 +1814,8 @@ function finishAbilityTurn(){
 
 function attemptFlee(hero){
     log(`${hero.name} rallies the fellowship to retreat...`);
-    if(Math.random()>0.45){log(`${hero.name} leads the party to safety!`);SFX.flee();hero.morality=clamp(hero.morality-5,-100,100);log(`${hero.name} bears a quiet shame at the retreat. (Morality -5)`);battle.active=false;setMusicMood('normal');setTimeout(nextTurn,500);}
+    const fleeChance=Math.min(0.80,0.40+hero.dex/90);
+    if(Math.random()<fleeChance){log(`${hero.name} leads the party to safety!`);SFX.flee();changeMorality(hero,-5);log(`${hero.name} bears a quiet shame at the retreat. (Morality -5)`);battle.active=false;setMusicMood('normal');setTimeout(nextTurn,500);}
     else{log(`The ${battle.monster.name} cuts off the retreat!`,'blood');SFX.bad();advanceBattleTurn();setTimeout(processBattleTurn,400);}
 }
 
@@ -1713,8 +1849,10 @@ function endCombat(won){
         if(battle.isPack)log(`The ${packFlavour(primary.name)} of ${primary.name}s is defeated!`);
         else log(`${primary.name} is defeated!`);
         SFX.good();
-        // Loot: full chance from leader, half from followers
-        battle.monsters.forEach((m,i)=>{if(Math.random()<m.loot*(i===0?1:0.50))giveLoot();});
+        // Loot: full chance from leader, half from followers — LCK improves odds
+        const lckHero=party.filter(h=>h.hp>0).reduce((b,h)=>h.lck>b.lck?h:b,{lck:10});
+        const lootLuckMult=Math.min(1.5,1+Math.max(0,lckHero.lck-10)/50);
+        battle.monsters.forEach((m,i)=>{if(Math.random()<m.loot*(i===0?1:0.50)*lootLuckMult)giveLoot();});
         // Boon from leader only
         if(primary.boon&&Math.random()<0.25){const h=aliveHero();if(h){if(primary.boon.hp)h.hp=Math.min(h.hp+primary.boon.hp,h.maxHp);if(primary.boon.int)h.int+=primary.boon.int;log(`Strange energy from ${primary.name} flows into ${h.name}!`);}}
         const ldr=party.find(h=>h&&h.isLeader&&h.hp>0);
@@ -1817,6 +1955,7 @@ function logPrompt(text){
     el.insertAdjacentElement('afterbegin',sep);
     const p=document.createElement('p');p.className='prompt-current';p.textContent=text;
     el.insertAdjacentElement('afterbegin',p);
+    updateLogFade();
 }
 function log(text,style='pale'){const el=document.getElementById('game-log'),p=document.createElement('p');if(style==='blood')p.classList.add('log-blood');else if(style==='speech')p.classList.add('log-speech');p.textContent=text;el.insertAdjacentElement('afterbegin',p);enrichLog(el,p);}
 function logHTML(html){
@@ -1889,6 +2028,16 @@ function enrichLog(_el, p) {
         const hpInfo=mon.hp?`<br>HP: <span style="color:#88ccff">${mon.hp}</span>  ATK: <span style="color:#ff7733">${mon.str}</span>`:'';
         showTip(span, `<span style="color:#ff9999">${mon.name}</span>${hpInfo}${lore}`);
     });
+    updateLogFade();
+}
+
+function updateLogFade(){
+    const el=document.getElementById('game-log');
+    if(!el)return;
+    const kids=el.children;
+    for(let i=0;i<kids.length;i++){
+        kids[i].style.opacity=Math.max(0.12,1-i*0.055).toFixed(2);
+    }
 }
 function setChoices(choices){
     const el=document.getElementById('ctrl-play');
@@ -1901,7 +2050,7 @@ function setChoices(choices){
         if(c.isFlee)    cls+=' btn-flee';
         btn.className=cls;
         if(c.disabled)  btn.classList.add('ability-cooldown');
-        btn.textContent=c.label;
+        btn.innerHTML=c.label;
         // Attach tooltip via global system
         if(c.tooltip) showTip(btn, c.tooltip);
         btn.addEventListener('click',()=>{

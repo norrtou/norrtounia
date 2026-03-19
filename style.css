@@ -357,6 +357,28 @@ body{
 .pi-name:hover  .stat-tooltip,
 .pi-sub:hover   .stat-tooltip{ display: block; }
 
+/* Morality change flash — green for gain, red for loss */
+.moral-flash{
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-family: var(--ff);
+    font-size: clamp(9px, .88vw, 13px);
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 301;
+    text-shadow: 0 0 5px rgba(0,0,0,1), 1px 1px 0 #000;
+    animation: moralFloat 2.2s ease-out forwards;
+}
+@keyframes moralFloat{
+    0%  { opacity:1; transform: translateX(-50%) translateY(0)    scale(1.20); }
+    18% {            transform: translateX(-50%) translateY(-6px)  scale(1.00); opacity:1; }
+    65% { opacity:.80; }
+    100%{ opacity:0; transform: translateX(-50%) translateY(-34px) scale(.85); }
+}
+
 /* Stat-flash level-up */
 .stat-flash{
     position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
