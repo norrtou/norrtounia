@@ -454,24 +454,28 @@ body{
     flex: 1; background: #000;
     display: flex; flex-direction: column;
     align-items: center; justify-content: flex-start;
-    gap: 4%; padding: 4% 3%;
+    gap: 4px; padding: 6px 4%;
     text-align: center;
     font-family: var(--ff);
     font-size: clamp(9px, .82vw, 13px);
-    line-height: 1.80; text-shadow: 1px 1px 0 #000;
+    line-height: 1.50; text-shadow: 1px 1px 0 #000;
     border: 1px solid var(--border);
     transition: border-color .18s;
+    overflow: hidden;
 }
 .slot-card:hover         { border-color: var(--goldbdr); }
 .slot-card.locked        { border-color: rgba(62,107,21,.60); }
 .slot-name{
     color: var(--gold);
-    font-size: clamp(11px, .95vw, 15px);
+    font-size: clamp(10px, .88vw, 14px);
     display: block;
+    line-height: 1.35;
+    word-break: break-word;
 }
 .slot-sub {
     color: var(--dim1); display: block;
-    font-size: clamp(9px, .80vw, 13px);
+    font-size: clamp(8px, .72vw, 11px);
+    line-height: 1.40;
 }
 .slot-stats{
     color: var(--white); display: block;
@@ -486,44 +490,44 @@ body{
 /* ── Alignment line ────────────────────────────── */
 .slot-align {
     display: block;
-    font-size: clamp(9px, .80vw, 12px);
+    font-size: clamp(8px, .70vw, 11px);
     letter-spacing: .03em;
-    margin-bottom: 2px;
     cursor: help;
-    border-bottom: 1px dotted rgba(255,255,255,.12);
-    padding-bottom: 3px;
+    border-bottom: 1px dotted rgba(255,255,255,.10);
+    padding-bottom: 2px;
+    width: 100%;
 }
 
 /* ── Stat grid ─────────────────────────────────── */
 .slot-stat-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 3px 10px;
+    gap: 1px 6px;
     width: 100%;
-    padding: 6px 2px;
+    padding: 2px 0;
 }
 .sg-cell {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: 1px 3px;
-    border-bottom: 1px solid rgba(255,255,255,.06);
+    padding: 1px 2px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
 }
 .sg-label {
     color: rgba(200,192,176,.45);
-    font-size: clamp(7px, .60vw, 9px);
+    font-size: clamp(7px, .58vw, 9px);
     letter-spacing: .06em;
     text-transform: uppercase;
 }
 .sg-num {
     color: var(--white);
-    font-size: clamp(13px, 1.15vw, 18px);
+    font-size: clamp(11px, 1.0vw, 16px);
     font-weight: bold;
     line-height: 1;
-    text-shadow: 0 0 8px rgba(255,255,255,.15);
+    text-shadow: 0 0 6px rgba(255,255,255,.12);
 }
 .sg-hp  { color: #5cbf40; }
-.sg-primary .sg-num { color: #88ccff; text-shadow: 0 0 8px rgba(136,204,255,.35); }
+.sg-primary .sg-num { color: #88ccff; text-shadow: 0 0 6px rgba(136,204,255,.30); }
 
 /* ── Badge row ─────────────────────────────────── */
 .slot-badges {
@@ -570,10 +574,12 @@ body{
     border: 1px solid var(--border);
     color: var(--white);
     font-family: var(--ff);
-    font-size: clamp(9px, .80vw, 13px);
-    padding: 5px 10px; cursor: pointer;
+    font-size: clamp(8px, .72vw, 11px);
+    padding: 4px 8px; cursor: pointer;
     transition: all .18s; text-shadow: 1px 1px 0 #000;
     margin-top: auto;
+    flex-shrink: 0;
+    width: 100%;
 }
 .bind-btn:hover{ border-color: var(--goldbdr); color: var(--amber); }
 .slot-card.locked .bind-btn{
