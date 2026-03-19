@@ -520,9 +520,11 @@ function withDiceRoll(heroIdx,actionFn,abilityId=null){
     battle.currentRoll=result;
     battle.alignmentBonus=null;
     const hero=party[heroIdx];
-    logHTML(`${hero?hero.name:'Hero'} raises the die — 🎲 `+
-        `<span style="color:${result.color};font-weight:bold">${result.roll}</span> `+
-        `<span style="color:${result.color}">${result.label}</span>`);
+    setTimeout(()=>{
+        logHTML(`${hero?hero.name:'Hero'} raises the die — 🎲 `+
+            `<span style="color:${result.color};font-weight:bold">${result.roll}</span> `+
+            `<span style="color:${result.color}">${result.label}</span>`);
+    },1300);
     showDiceRollOnCard(`portrait-card-${heroIdx}`,result,()=>{
         // Resolve alignment effect before action fires
         if(abilityId&&hero){
@@ -1341,7 +1343,13 @@ function doUneventfulTurn(){
         `${tc('good','✓ Clears any lingering afflictions')}<br><br>`+
         `${tc('lore','The fellowship takes a full respite. One trial spent.')}`;
     setChoices([
-        {label:'[1] Press on through the wood',tooltip:tc('lore','→ Safe — continue forward, no effect'),action:()=>{log(ev.pressOn);SFX.neutral();setTimeout(nextTurn,40);}},
+        {label:'[1] Press on through the wood',tooltip:
+            `${tc('good','→ The fellowship walks in purposeful silence.')}<br>`+
+            `${tc('lore','Something about keeping on lifts the spirit — a quiet dignity in not stopping.')}<br><br>`+
+            `<span style="color:#e8c45a">✦ +5 Morality to all heroes</span> <span style="color:#aaaaaa">(lasts until first round of next battle)</span>`,
+         action:()=>{
+            party.filter(h=>h&&h.hp>0).forEach(h=>{h.pressOnMoralBoost=5;});
+            log(ev.pressOn);SFX.neutral();setTimeout(nextTurn,40);}},
         {label:'[2] Rest and recover',tooltip:restTip,action:()=>{fullPartyRest(ev.restFlavour);setTimeout(nextTurn,40);}},
         {label:'[3] Search the surroundings',action:()=>{const best=Math.max(...party.filter(h=>h.hp>0).map(h=>h.lck));if(Math.random()<0.12+best*0.008)giveLoot();else log('Naught of value is found here.');log(ev.searchFlavour);SFX.neutral();setTimeout(nextTurn,40);},tooltip:tc('item','🍀 ~12–25% chance to find an item')+' (LCK improves this)'},
     ]);
@@ -1488,6 +1496,12 @@ function doCombat(){
         log(`Initiative: ${order.map(e=>`${e.type==='hero'?e.entity.name:battle.monster.name}(${e.initiative})`).join(' › ')}`);
         if(cohMod>0)log(`✦ Aligned fellowship — cohesion grants +${cohMod} to all initiative.`);
         else if(cohMod<0)log(`⚠ Divided fellowship — alignment conflict: ${cohMod} to all initiative.`,'blood');
+    }
+    // Apply press-on morale boost if set
+    const boosted=party.filter(h=>h&&h.pressOnMoralBoost);
+    if(boosted.length){
+        boosted.forEach(h=>{changeMorality(h,h.pressOnMoralBoost);delete h.pressOnMoralBoost;});
+        logHTML(`<span style="color:#e8c45a">✦ The fellowship's resolve steels them — morale carries into the fray! (+5 Morality to all)</span>`);
     }
     log('━━━ Battle Round 1 ━━━');
     renderStats();
