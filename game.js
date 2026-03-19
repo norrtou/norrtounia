@@ -1307,6 +1307,7 @@ function renderPortraitStrip(){
    ═══════════════════════════════════════════════════════════════ */
 function startGame(){SFX.start();turn=0;treasury={gold:0,gems:0};detectPartyLeader();showScreen('screen-play');showCtrl('ctrl-play');logPrompt('Thy fellowship crosseth the threshold. The wood closeth behind thee.');log(`${MAX_TURNS} trials lie ahead. May the Old Gods watch over thee.`);nextTurn();}
 
+let lastTurnWasCombat=false;
 function nextTurn(){
     turn++;passiveHeal();detectPartyLeader();renderStats();renderTreasury();
     if(turn>MAX_TURNS)return endGame(true);
@@ -1314,9 +1315,8 @@ function nextTurn(){
     if(Math.random()<0.15)log(pick(GAME_DATA.ambience));
     if(Math.random()<0.10)doTreasuryEvent();
     const r=Math.random();
-    if(r<0.30)doCombat();
-    else if(r<0.85)doScenario();
-    else doUneventfulTurn();
+    if(!lastTurnWasCombat&&r<0.30){lastTurnWasCombat=true;doCombat();}
+    else{lastTurnWasCombat=false;if(r<0.85)doScenario();else doUneventfulTurn();}
 }
 
 function passiveHeal(){party.forEach(h=>{if(h.hp<=0||h.hp>=h.maxHp)return;if(Math.random()>0.40+h.sta*0.015)return;const a=Math.max(1,Math.floor(h.maxHp*(rand(1,3)+Math.floor(h.sta/5))/100));h.hp=Math.min(h.hp+a,h.maxHp);log(pick(GAME_DATA.healFlavors).replace('{name}',h.name).replace('{hp}',`+${a} HP`));SFX.heal();});}
